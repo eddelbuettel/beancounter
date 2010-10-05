@@ -1,0 +1,16 @@
+
+* stock splits
+
+* annualised returns
+
+* clean up code
+
+* more error checking on calls to DBI et al
+
+* read more info from the rc file ~/.beancounterrc such as host, 
+  port, user, ... 
+
+* allow "restrictions" on beancounter operations, eg do a portfolio update at
+  13:00 EST with the restriction of doing it only for shares with currencies
+  that are GBP or EUR (or SEK or DKK ...) to get the European market
+

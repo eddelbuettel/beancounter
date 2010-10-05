@@ -1,0 +1,435 @@
+#!/usr/bin/perl -w
+#
+#   beancounter --- A stock portfolio performance monitoring tool
+#  
+#   Copyright (C) 1998, 1999, 2000  Dirk Eddelbuettel <edd@debian.org>
+#  
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#  
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#  
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+#   $Id: beancounter,v 1.5 2000/07/24 03:36:35 edd Exp $
+
+# adjust @INC to let the current development version be found first
+BEGIN { @INC = ( ".", @INC ) }
+
+use strict;			# be careful
+use Carp;			# error messages
+use Data::Dumper;		# to debugging data structures
+use Date::Manip;		# for date parsing
+use English;			# explicit variable names
+use Getopt::Long;		# long options
+use vars qw($help $debug $verbose $datearg $prevdatearg 
+	    $fromdatearg $todatearg $rcfilearg);
+
+use Finance::BeanCounter;
+
+my $version = "0.1.0";		# updated from the debian/rules Makefile
+my $date =			# inner expression updated by RCS
+  sprintf("%s", q$Date: 2000/07/24 03:36:35 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+
+
+my $rcfile = $ENV{HOME} . "/.beancounterrc";
+
+my %options = ("help" 		=> \$help,
+	       "debug"		=> \$debug,
+	       "date=s"		=> \$datearg,
+	       "prevdate=s"	=> \$prevdatearg,
+	       "fromdate=s"    	=> \$fromdatearg,
+	       "todate=s"	=> \$todatearg,
+	       "rcfile=s"	=> \$rcfile,
+	       "verbose"	=> \$verbose);
+
+help_and_exit() if (!GetOptions(%options) or $help or $#ARGV < 0);
+$OUTPUT_AUTOFLUSH = 1;
+
+my %Config = GetConfig($rcfile, $debug, $verbose);
+my $dbh = ConnectToDb(); 
+
+my $command = shift @ARGV;
+if ($command =~ /^plreport$/) {
+  portfolio_report();
+} elsif ($command =~ /^backpopulate$/) {
+  backpopulate(@ARGV);
+} elsif ($command =~ /^addindex$/) {
+  add_index(@ARGV);
+} elsif ($command =~ /^addstock$/) {
+  add_stock(@ARGV);
+} elsif ($command =~ /^addportfolio$/) {
+  add_portfolio(@ARGV);
+} elsif ($command =~ /^dayendreport$/) {
+  day_end_report();
+} elsif ($command =~ /^dailyjob$/) {
+  portfolio_update(@ARGV);
+  day_end_report();
+} elsif ($command =~ /^delete$/) {
+  delete_stock(@ARGV);
+} elsif ($command =~ /^destroydb$/) {
+  deletedb(@ARGV);
+} elsif ($command =~ /^quote$/) {
+  quote(@ARGV);
+} elsif ($command =~ /^update$/) {
+  portfolio_update(@ARGV);
+} elsif ($command =~ /^warranty$/) {
+  warranty();
+} else {
+  warn "Ignoring unknown command '$command'.";
+}
+
+CloseDB($dbh);
+
+exit 0;
+
+# ---------------------- local functions ------------------------------------
+
+sub help_and_exit {
+  my $BeanCounterVersion = BeanCounterVersion;
+  print STDERR "
+beancounter -- A stock portfolio performance monitoring tool
+
+beancounter version $version ($BeanCounterVersion) of $date
+Copyright (C) 1998, 1999, 2000 by Dirk Eddelbuettel <edd\@debian.org>
+beancounter comes with ABSOLUTELY NO WARRANTY. This is free software, 
+and you are welcome to redistribute it under certain conditions. 
+Please try '$PROGRAM_NAME warranty' for more details, or visit the
+website at   http://www.gnu.org/philosophy/free-sw.html 
+
+Usage:
+    beancounter [options] command [args]
+
+Options:
+    --help			show this help
+    --date date			[ plreport ] report for this date (today)
+    --prevdate date		[ plreport ] relative to this date (yesterday)
+    --fromdate date		[ backpopulate ] start from this date (1/1/99)
+    --todate date		[ backpopulate ] end at this date (yesterday)
+
+Commands:
+    addindex index args	        add stock(s) to market index 'index' 
+    addportfolio arg:nb:fx ...	add nb of arg in currency fx to portfolio
+    addstock arg ...		add stock(s) to database 
+    backpopulate  arg ...	fill with historic data for given stock(s)
+    dailyjob			combines 'update' and 'dayendreport' 
+    dayendreport		reports changes relative to the previous day
+    deletestock arg ...		delete stock(s) from database
+    destroydb			delete the BeanCounter database
+    plreport			run an end-of-day portfolio report
+    quote arg ...		report current data for given stock(s)
+    update			update the database with day's data
+    warranty			display the short GNU GPL statement
+
+Examples:
+    beancounter addportfolio SUNW:100:USD VOD.L:50:GBP
+    beancounter addstock CBOT LNUX RHAT COR.TO
+    beancounter --from 19940101 --to 19983112 backpopulate MSFT SUNW
+\n";
+  exit 1;
+}
+
+sub warranty {
+  my $BeanCounterVersion = BeanCounterVersion;
+  open (FILE, "< $PROGRAM_NAME");
+  my $on = 0;			# have we already had comment lines?
+  while (<FILE>) {		# show header
+    last if (m/\$Id/);		# quit if we reach the RCS code
+    next unless (m/^\#\s+/ or $on);
+    $on = 1;			# note the new state
+    $ARG =~ s/^\#//;		# minus the leading '#'
+    print STDERR $ARG;
+  }
+  close(FILE);
+  print STDERR "   beancounter version $version ($BeanCounterVersion) as of $date\n\n";
+}
+
+sub display_report {
+  my ($pretty_date, $pretty_prev_date, $prices, $prev_prices,
+      $fx_prices, $prev_fx_prices, $shares, $fx) = @_;
+
+  my $tl = "=" x 79;		# thick line
+  my $fl = "-" x 79;		# fine line
+  print "$tl\n" . "Profit / loss\t\t from $pretty_prev_date" .
+    "\tto $pretty_date  abs, rel change" . "\n$fl\n";
+  my ($value, $value_prev, $assets, $assets_prev) = (0,0,0,0);
+  foreach my $key (sort keys %$prices) {
+    $value = $shares->{$key} * $prices->{$key} 
+      * $fx_prices->{$fx->{$key}} / $fx_prices->{$Config{currency}};
+    $value_prev = $shares->{$key} * $prev_prices->{$key} 
+      * $prev_fx_prices->{$fx->{$key}} / $prev_fx_prices->{$Config{currency}};
+    printf("%*s  %3s %10.2f %8.2f  %10.2f %8.2f %8.2f %6.2f%%\n", 
+	   -16, substr($key,0,16), $fx->{$key}, 
+	   $value_prev, $prev_prices->{$key},
+	   $value, $prices->{$key}, 
+	   $value-$value_prev, 100*($value/$value_prev-1)); 
+    $assets += $value;
+    $assets_prev += $value_prev;
+  }
+  print "$fl\n";
+  printf("%-16s      %10.2f           %10.2f      %12.2f %6.2f%%\n", 
+	 "Grand Total",  $assets_prev, 	 $assets, 
+	 $assets-$assets_prev, 100*($assets/$assets_prev-1));
+  print "$tl\n";
+}
+
+
+sub day_end_report {
+  my ($date, $prev_date) = GetTodaysAndPreviousDates();
+
+  # create 'prettier' non-ISO 8601 form
+  my $pretty_date = UnixDate(ParseDate($date), "%d %b %Y");
+  my $pretty_prev_date = UnixDate(ParseDate($prev_date), "%d %b %Y");
+
+  my ($fx, $prices, $prev_prices, $shares) = GetPriceData($dbh,$date);
+  $fx->{'home currency'} = $Config{currency};
+  my ($fx_prices, $prev_fx_prices) = GetFXData($dbh, $date, $fx);
+  display_report($pretty_date, $pretty_prev_date, $prices, $prev_prices,
+		 $fx_prices, $prev_fx_prices, $shares, $fx);
+}
+
+
+# portfolio_report -- with two "free" dates, ie from last month to last week
+sub portfolio_report {
+  my ($date, $prev_date) = GetTodaysAndPreviousDates();
+
+  # override with optional dates, if supplied
+  $date      = UnixDate(ParseDate($datearg),    "%Y%m%d") if ($datearg); 
+  $prev_date = UnixDate(ParseDate($prevdatearg),"%Y%m%d") if ($prevdatearg); 
+
+  # create 'prettier' non-ISO 8601 form
+  my $pretty_date = UnixDate(ParseDate($date), "%d %b %Y");
+  my $pretty_prev_date = UnixDate(ParseDate($prev_date), "%d %b %Y");
+
+  my ($fx, $prices, $tmp1, $shares) = GetPriceData($dbh,$date);
+  my ($tmp2, $prev_prices)          = GetPriceData($dbh,$prev_date);
+
+  $fx->{'home currency'} = $Config{currency};
+  my ($fx_prices)      = GetFXData($dbh, $date, $fx);
+  my ($prev_fx_prices) = GetFXData($dbh, $prev_date, $fx);
+
+  display_report($pretty_date, $pretty_prev_date, $prices, $prev_prices,
+		 $fx_prices, $prev_fx_prices, $shares, $fx);
+
+}
+
+
+sub portfolio_update {
+  UpdateFXDatabase($dbh,  "");	# update db with empty constraint
+  UpdateDatabase($dbh,  "");	# update db with empty constraint
+}
+
+
+sub backpopulate {
+  my @arg = @_;
+  my $fromdate = 19990101;	# default to start in Jan of 1999
+  my $todate = UnixDate(ParseDate("yesterday"),"%Y%m%d");
+
+  $fromdate = UnixDate(ParseDate($fromdatearg),"%Y%m%d") if ($fromdatearg); 
+  $todate = UnixDate(ParseDate($todatearg),"%Y%m%d") if ($todatearg); 
+
+  foreach my $symbol (@arg) {
+    # we need to query the DB to see if this symbol was registered
+    my $stmt = qq{ select symbol from stockinfo where symbol = ? };
+    my $sth = $dbh->prepare($stmt);
+    my $rv = $sth->execute($symbol);
+    while (my $r = $sth->fetch) {
+      print "   adding $r->[0] from $fromdate to $todate\n";
+      my @arr = GetHistoricalData($r->[0], $fromdate, $todate);
+      PrintHistoricalData($r->[0], @arr) if $Config{verbose};
+      DatabaseHistoricalData($dbh, $r->[0], @arr);
+    }
+    $sth->finish;
+  }
+}
+
+
+sub quote {
+  my @arg = @_;
+  my @data = GetDailyData(@arg); 	# fetch data 
+  my %data = ParseDailyData(@data); 	# fill assoc. array
+  ReportDailyData(%data);		# report data
+}
+
+
+sub add_index {
+  my @arg = @_;
+  my $index = shift @arg;	# get the index argument
+  foreach my $arg (@arg) {	# and loop over the stocks
+    my $cmd = "insert into indices values ( '$arg', '$index' );";
+    print "$cmd\n" if $Config{verbose};
+    $dbh->do($cmd) or warn "\nFailed with $cmd\n";
+  }
+}
+
+
+sub add_stock {
+  my @arg = @_;
+  my @data = GetDailyData(@arg);
+  my %data = ParseDailyData(@data);
+  ReportDailyData(%data) if $verbose;
+  DatabaseInfoData($dbh, %data);
+  DatabaseDailyData($dbh, %data);
+}
+
+
+sub add_portfolio {
+  my @arg = @_;
+
+  # statement for insertion into portfolio
+  my $stmt = qq{insert into portfolio values ( ?, ?, ? );};
+  my $sth = $dbh->prepare($stmt);
+
+  # statement to check if this symbol already in info
+  my $infostmt = qq{ select symbol from stockinfo where symbol = ? };
+  my $infosth = $dbh->prepare($infostmt);
+
+  my @symbol;
+
+  foreach my $arg (@arg) {	# and loop over the stocks
+    my ($stock,$nb,$fx) = (undef, undef, undef);
+    ($stock,$nb,$fx) = split /:/, $arg;
+    $fx = $Config{currency} unless defined($fx); 
+    if (defined($stock) and defined($nb)) {
+      $sth->execute($stock, $nb, $fx);
+    } else {
+      warn "Ignoring invalid argument $arg\n";
+    }
+
+    $infosth->execute($stock);
+    push @symbol, $stock unless ($infosth->fetch);
+
+  }
+  $sth->finish;
+  $infosth->finish;
+
+  add_stock(@symbol)		# make sure 'new' stocks get added to DB
+}
+
+
+sub delete_stock {
+  my @arg = @_;
+
+  foreach my $arg (@arg) {	# and loop over the stocks
+    foreach my $table (qw/ stockinfo stockprices indices portfolio/) {
+      my $cmd = "delete from $table where symbol = '$arg';";
+      print "$cmd\n" if $Config{verbose};
+      $dbh->do($cmd) or warn "\nFailed with $cmd\n";
+    }
+  }
+}
+
+
+sub deletedb {
+  system("destroydb beancounter") == 0 or croak "Could not destroy database";
+}
+
+
+__END__				# that's it, folks!  Documentation below
+
+#---- Documentation ---------------------------------------------------------
+
+=head1 NAME
+
+beancounter - Stock portfolio performance monitor tool
+
+=head1 SYNOPSYS
+
+ beancounter [options] command [stock_symbol ...]
+
+=head1 COMMANDS
+
+ addindex index args         add stock(s) to market index 'indx'
+ addportfolio arg:nb:fx ...  add nb stocks of arg to portfolio
+ addstock arg ...            add stock(s) to database
+ dailyjob		     combines 'update' and 'dayendreport' 
+ dayendreport		     combines 'update' and 'plreport' 
+ deletestock arg ...	     delete stock(s) from database
+ destroydb                   delete the BeanCounter database
+ backpopulate arg ...        fill with historic data for given stock(s)
+ plreport                    run an end-of-day portfolio report
+ quote arg ...               report current data for given stock(s)
+ update                      update the database with day's data
+
+=head1 OPTIONS
+
+ --help                      show this help
+ --date date                 [ plreport ] report for this date (today)
+ --prevdate date             [ plreport ] relative to this date (yesterday)
+ --fromdate date             [ backpopulate ] start from this date (1/1/99)
+ --todate date               [ backpopulate ] end at this date (yesterday)
+
+=head1 DESCRIPTION
+
+B<beancounter> analyses stock market data to evaluate portfolio
+performance.  It has several modes. The first main mode is data
+gathering: both current data (e.g. end-of-day closing prices) and
+historical price data (to backpopulate) can be retrieved and are
+automatically stored in a relational database. The second main mode is
+data analysis where the stored data is evaluated to provide
+performance information.
+
+Data is retrieved from the Yahoo! Finance web sites. 
+
+B<beancounter> can also aggregate the change in value for the entire
+portfolio over arbitrary time horizons.
+
+B<beancounter> has been written and tested under Linux. It should run under
+any standard Unix as long as the required Perl modules are installed,
+as as long as the DB (currently hardwired to PostgreSQL) is found.
+
+=head1 EXAMPLES
+
+ beancounter addportfolio SUNW:100 IBM:50
+ beancounter addstock CBOT LNUX RHAT COR.TO
+ beancounter backpopulate --fromdate '1 year ago' \
+                          --todate 'friday 1 week ago' IBM SUNW HWP
+ beancounter plreport --fromdate '1 month ago' --todate 'today'
+
+=head1 BUGS
+
+B<Finance::BeanCounter> and B<beancounter> are so fresh that there are
+only missing features right now :) Seriously, check the TODO list.
+
+On a more serious note, this code or its predecessors have been used
+by the author for a good year and a half now.
+
+=head1 SEE ALSO
+
+F<Finance::BeanCounter.3pm>, F<smtm.1>, F<Finance::YahooQuote.3pm>,
+F<LWP.3pm>, F<Date::Manip.3pm>
+
+=head1 COPYRIGHT
+
+beancounter is (c) 2000 by Dirk Eddelbuettel <edd@debian.org>
+
+Updates to this program might appear at 
+F<http://rosebud.sps.queensu.ca/~edd/code/beancounter.html>.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.  There is NO warranty whatsoever.
+
+The information that you obtain with this program may be copyrighted
+by Yahoo! Inc., and is governed by their usage license.  See
+F<http://www.yahoo.com/docs/info/gen_disclaimer.html> for more
+information.
+
+=head1 ACKNOWLEDGEMENTS
+
+The Finance::YahooQuote module by Dj Padzensky (on the web at
+F<http://www.padz.net/~djpadz/YahooQuote/>) served as the backbone for
+data retrieval, and a guideline for the extension to the non-North
+American quotes which was already very useful for the real-time ticker 
+F<http://rosebud.sps.queensu.ca/~edd/code/smtm.html>.
+
+=cut
+

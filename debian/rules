@@ -1,0 +1,84 @@
+#! /usr/bin/make -f
+#                                                       -*- makefile -*-
+# debian/rules file for the Debian/GNU Linux beancounter package
+# Copyright (C) 2000 by Dirk Eddelbuettel <edd@debian.org>
+
+package	:= $(shell grep Package debian/control | sed 's/^Package: //')
+version	:= $(shell head -1 debian/changelog | \
+			perl -nle 'm/\S+\s+\((\S+)\)/ && print $$1')
+debtmp	:= $(shell pwd)/debian/tmp
+
+srcdir  := /home/edd/progs/perl/beancounter
+
+# New Perl Policy by Raphael
+ifndef PERL
+PERL = /usr/bin/perl
+endif
+
+TMP     =`pwd`/debian/tmp
+archlib =`$(PERL) -MConfig -e 'print $$Config{installarchlib}'`
+config  =INSTALLDIRS=perl INSTALLMAN1DIR=$(TMP)/usr/share/man/man1 INSTALLMAN3DIR=$(TMP)/usr/share/man/man3 INSTALLPRIVLIB=$(TMP)/usr/lib/perl5 INSTALLARCHLIB=$(TMP)$(archlib) INSTALLSCRIPT=$(TMP)/usr/bin
+
+update:
+	cp -af	$(srcdir)/BeanCounter.pm 	\
+		$(srcdir)/beancounter 		\
+		$(srcdir)/README 		\
+		$(srcdir)/TODO	 		\
+		$(srcdir)/Makefile.PL 		\
+		$(srcdir)/setup_beancounter		.
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+	$(PERL) Makefile.PL $(config)
+	pod2html --flush $(package) > $(package).html
+	pod2man          $(package) > $(package).1
+	$(MAKE)
+	# update the $$version field in the perl code
+	perl -p -i -e \
+		"s/version = \".*\";/version = \""$(version)"\";/" $(package)
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp 
+	-test -f Makefile && $(MAKE) realclean
+	-rm -f pod2html-itemcache pod2html-dircache
+	dh_clean
+
+binary-indep: build
+	dh_testversion ge 2.0.40
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+#	dh_installdirs		usr/bin usr/share/man/man1
+	dh_installdirs		usr/bin 
+#	$(MAKE) 		pure_install
+	$(MAKE) 		prefix=$(debtmp)/usr pure_install
+#	install beancounter $(debtmp)/usr/bin
+	dh_perl	
+	dh_installdocs		
+#	dh_installexamples	setup_beancounter 
+#	dh_installmenu
+#	dh_installinit
+#	dh_installcron
+	dh_installmanpages	
+	dh_undocumented		setup_beancounter.1
+	dh_installchangelogs	
+	dh_compress
+	dh_fixperms
+#	dh_suidregister
+	dh_installdeb
+	dh_gencontrol
+#	dh_md5sums
+	dh_builddeb
+
+binary-arch: build
+
+source diff:                                                                  
+	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary
+

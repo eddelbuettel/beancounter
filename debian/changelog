@@ -1,0 +1,9 @@
+beancounter (0.1.0) unstable; urgency=low
+
+  * Initial Debian (and upstream) release.
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Sun, 23 Jul 2000 22:14:17 -0400
+
+Local variables:
+mode: debian-changelog
+End:

@@ -1,0 +1,151 @@
+<HTML>
+<HEAD>
+<TITLE>beancounter - Stock portfolio performance monitor tool</TITLE>
+<LINK REV="made" HREF="mailto:none">
+</HEAD>
+
+<BODY>
+
+<!-- INDEX BEGIN -->
+
+<UL>
+
+	<LI><A HREF="#NAME">NAME</A>
+	<LI><A HREF="#SYNOPSYS">SYNOPSYS</A>
+	<LI><A HREF="#COMMANDS">COMMANDS</A>
+	<LI><A HREF="#OPTIONS">OPTIONS</A>
+	<LI><A HREF="#DESCRIPTION">DESCRIPTION</A>
+	<LI><A HREF="#EXAMPLES">EXAMPLES</A>
+	<LI><A HREF="#BUGS">BUGS</A>
+	<LI><A HREF="#SEE_ALSO">SEE ALSO</A>
+	<LI><A HREF="#COPYRIGHT">COPYRIGHT</A>
+	<LI><A HREF="#ACKNOWLEDGEMENTS">ACKNOWLEDGEMENTS</A>
+</UL>
+<!-- INDEX END -->
+
+<HR>
+<P>
+<H1><A NAME="NAME">NAME</A></H1>
+<P>
+beancounter - Stock portfolio performance monitor tool
+
+<P>
+<HR>
+<H1><A NAME="SYNOPSYS">SYNOPSYS</A></H1>
+<P>
+<PRE> beancounter [options] command [stock_symbol ...]
+</PRE>
+<P>
+<HR>
+<H1><A NAME="COMMANDS">COMMANDS</A></H1>
+<P>
+<PRE> addindex index args         add stock(s) to market index 'indx'
+ addportfolio arg:nb:fx ...  add nb stocks of arg to portfolio
+ addstock arg ...            add stock(s) to database
+ dailyjob                    combines 'update' and 'dayendreport' 
+ dayendreport                combines 'update' and 'plreport' 
+ deletestock arg ...         delete stock(s) from database
+ destroydb                   delete the BeanCounter database
+ backpopulate arg ...        fill with historic data for given stock(s)
+ plreport                    run an end-of-day portfolio report
+ quote arg ...               report current data for given stock(s)
+ update                      update the database with day's data
+</PRE>
+<P>
+<HR>
+<H1><A NAME="OPTIONS">OPTIONS</A></H1>
+<P>
+<PRE> --help                      show this help
+ --date date                 [ plreport ] report for this date (today)
+ --prevdate date             [ plreport ] relative to this date (yesterday)
+ --fromdate date             [ backpopulate ] start from this date (1/1/99)
+ --todate date               [ backpopulate ] end at this date (yesterday)
+</PRE>
+<P>
+<HR>
+<H1><A NAME="DESCRIPTION">DESCRIPTION</A></H1>
+<P>
+<STRONG>beancounter</STRONG> analyses stock market data to evaluate portfolio performance. It has
+several modes. The first main mode is data gathering: both current data
+(e.g. end-of-day closing prices) and historical price data (to
+backpopulate) can be retrieved and are automatically stored in a relational
+database. The second main mode is data analysis where the stored data is
+evaluated to provide performance information.
+
+<P>
+Data is retrieved from the Yahoo! Finance web sites. 
+
+<P>
+<STRONG>beancounter</STRONG> can also aggregate the change in value for the entire portfolio over
+arbitrary time horizons.
+
+<P>
+<STRONG>beancounter</STRONG> has been written and tested under Linux. It should run under any standard
+Unix as long as the required Perl modules are installed, as as long as the
+DB (currently hardwired to PostgreSQL) is found.
+
+<P>
+<HR>
+<H1><A NAME="EXAMPLES">EXAMPLES</A></H1>
+<P>
+<PRE> beancounter addportfolio SUNW:100 IBM:50
+ beancounter addstock CBOT LNUX RHAT COR.TO
+ beancounter backpopulate --fromdate '1 year ago' \
+                          --todate 'friday 1 week ago' IBM SUNW HWP
+ beancounter plreport --fromdate '1 month ago' --todate 'today'
+</PRE>
+<P>
+<HR>
+<H1><A NAME="BUGS">BUGS</A></H1>
+<P>
+<STRONG>Finance::BeanCounter</STRONG> and <STRONG>beancounter</STRONG> are so fresh that there are only missing features right now :) Seriously,
+check the TODO list.
+
+<P>
+On a more serious note, this code or its predecessors have been used by the
+author for a good year and a half now.
+
+<P>
+<HR>
+<H1><A NAME="SEE_ALSO">SEE ALSO</A></H1>
+<P>
+<EM>Finance::BeanCounter.3pm</EM>, <EM>smtm.1</EM>, <EM>Finance::YahooQuote.3pm</EM>,
+<EM>LWP.3pm</EM>, <EM>Date::Manip.3pm</EM>
+
+
+
+<P>
+<HR>
+<H1><A NAME="COPYRIGHT">COPYRIGHT</A></H1>
+<P>
+beancounter is (c) 2000 by Dirk Eddelbuettel &lt;<A
+HREF="mailto:edd@debian.org">edd@debian.org</A>&gt;
+
+<P>
+Updates to this program might appear at 
+<EM>http://rosebud.sps.queensu.ca/~edd/code/beancounter.html</EM>.
+
+<P>
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version. There is NO warranty whatsoever.
+
+<P>
+The information that you obtain with this program may be copyrighted by
+Yahoo! Inc., and is governed by their usage license. See
+<EM>http://www.yahoo.com/docs/info/gen_disclaimer.html</EM> for more information.
+
+<P>
+<HR>
+<H1><A NAME="ACKNOWLEDGEMENTS">ACKNOWLEDGEMENTS</A></H1>
+<P>
+The Finance::YahooQuote module by Dj Padzensky (on the web at
+<EM>http://www.padz.net/~djpadz/YahooQuote/</EM>) served as the backbone for data retrieval, and a guideline for the
+extension to the non-North American quotes which was already very useful
+for the real-time ticker 
+<EM>http://rosebud.sps.queensu.ca/~edd/code/smtm.html</EM>.
+
+</BODY>
+
+</HTML>

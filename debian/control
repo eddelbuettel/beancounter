@@ -1,0 +1,17 @@
+Source: beancounter
+Section: misc
+Priority: optional
+Maintainer: Dirk Eddelbuettel <edd@debian.org>
+Standards-Version: 3.1.0
+Build-Depends: debhelper
+
+Package: beancounter
+Architecture: all
+Depends: ${perl:Depends}, libwww-perl, libhtml-parser-perl, libdate-manip-perl, libdbi-perl, libdbd-pg-perl | libdbd-odbc-perl, postgresql-client
+Description: A stock portfolio performance monitoring tool
+ This package provides beancounter, a tool to quantify gains and losses in
+ stock portfolios, as well as the BeanCounter Perl module that underlies it. 
+ Beancounter queries stockprices from Yahoo! Finance server(s) around the 
+ globe and stores them in a relational database (using PostgreSQL) so
+ that the data can be used for further analysis.  Canned performance reports
+ are available.
