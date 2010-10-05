@@ -9,6 +9,7 @@ version	:= $(shell head -1 debian/changelog | \
 debtmp	:= $(shell pwd)/debian/tmp
 
 srcdir  := /home/edd/progs/perl/beancounter
+webdir  := /home/edd/www/code/beancounter
 
 # New Perl Policy by Raphael
 ifndef PERL
@@ -25,7 +26,19 @@ update:
 		$(srcdir)/README 		\
 		$(srcdir)/TODO	 		\
 		$(srcdir)/Makefile.PL 		\
-		$(srcdir)/setup_beancounter		.
+		$(srcdir)/setup_beancounter	\
+		$(srcdir)/update_beancounter		.
+
+webdir:
+	cp -af  ../$(package)_$(version).tar.gz  \
+		../$(package)_$(version)_all.deb \
+	        debian/changelog		$(webdir)
+	(cd $(webdir); \
+		mv changelog ChangeLog;		\
+		ln -sfv	$(package)_$(version).tar.gz \
+			$(package)-current.tar.gz ;  \
+		ln -sfv	$(package)_$(version)_all.deb \
+			$(package)-current.deb)
 
 build: build-stamp
 build-stamp:
@@ -42,7 +55,7 @@ build-stamp:
 clean:
 	dh_testdir
 	dh_testroot
-	rm -f build-stamp 
+	rm -f build-stamp .html
 	-test -f Makefile && $(MAKE) realclean
 	-rm -f pod2html-itemcache pod2html-dircache
 	dh_clean

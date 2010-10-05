@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.6 2000/07/26 02:45:50 edd Exp $
+#  $Id: BeanCounter.pm,v 1.12 2000/11/23 19:06:37 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -31,7 +31,8 @@ use DBI;			# for the Perl interface to the database
 use English;			# friendlier variable names
 use HTTP::Request::Common;	# grab data from Yahoo's web interface
 use LWP::UserAgent;		# for data queries from http://quote.yahoo.com
-use Text::ParseWords;		# parse .csv files more reliably
+use POSIX qw(strftime);		# for date formatting
+use Text::ParseWords;		# parse .csv data more reliably
 
 @ISA = qw(Exporter);		# make these symbols known
 @EXPORT = qw(BeanCounterVersion
@@ -58,7 +59,7 @@ use Text::ParseWords;		# parse .csv files more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.6 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.12 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -92,6 +93,8 @@ sub GetTodaysAndPreviousDates {
   my ($date, $prev_date);
   my $today = DateCalc(ParseDate("today"), "- 8 hours");
 
+  # Depending on whether today is a working day, use today 
+  # or the most recent preceding working day
   if (Date_IsWorkDay($today)) {
     $date = UnixDate($today, "%Y%m%d");
     $prev_date = UnixDate(DateCalc($today, "- 1 business days"), "%Y%m%d");
@@ -99,12 +102,23 @@ sub GetTodaysAndPreviousDates {
     $date = UnixDate(DateCalc($today, "- 1 business days"), "%Y%m%d");
     $prev_date = UnixDate(DateCalc($today, "- 2 business days"), "%Y%m%d");
   }
-  return ($date, $prev_date);
+
+  # override with optional dates, if supplied
+  $date      = UnixDate(ParseDate($main::datearg),    "%Y%m%d") 
+    if ($main::datearg); 
+  $prev_date = UnixDate(ParseDate($main::prevdatearg),"%Y%m%d") 
+    if ($main::prevdatearg); 
+
+  # and create 'prettier' non-ISO 8601 form
+  my $pretty_date = UnixDate(ParseDate($date), "%d %b %Y");
+  my $pretty_prev_date = UnixDate(ParseDate($prev_date), "%d %b %Y");
+
+  return ($date, $prev_date, $pretty_date, $pretty_prev_date);
 }
 
 
 sub GetConfig {
-  my ($file, $debug, $verbose) = @_;
+  my ($file, $debug, $verbose, $fx, $extrafx) = @_;
 
   %Config = ();			# reset hash
 
@@ -118,6 +132,9 @@ sub GetConfig {
   $Config{user} = $ENV{USER};	# default user is current user
   $Config{passwd} = undef;	# default password is no password
 
+  $Config{today} = strftime("%Y%m%d", localtime);
+  ($Config{lastbizday}, $Config{prevbizday}) = GetTodaysAndPreviousDates;
+
   # DSN name for ODBC
   $Config{dsn} = "beancounter";	# default ODBC data source name
 
@@ -125,7 +142,7 @@ sub GetConfig {
   $Config{host} = "localhost";	# default to local machine
 
   unless ( -f $file ) {
-    warn "Config file $file not found, ignored.\n";
+    carp "Config file $file not found, ignored.";
     return %Config;
   }
 
@@ -133,11 +150,16 @@ sub GetConfig {
   while (<FILE>) {
     next if (m/(\#|%)/);	# ignore comments, if any
     next if (m/^\s*$/);		# ignore empty lines, if any
-    if (m/^\s*(\w+)\s*=\s*(\w+)\s*$/) {
+    if (m/^\s*(\w+)\s*=\s*(.+)\s*$/) {
       $Config{$1} = "$2";
     }
   }
   close(FILE);
+
+  $Config{currency} = $fx if defined($fx);
+  $Config{extrafx} = $extrafx if defined($extrafx);
+  
+  print Dumper(\%Config) if $Config{debug};
   return %Config;
 }
 
@@ -145,7 +167,7 @@ sub GetConfig {
 sub GetDailyData {		# use Finance::YahooQuote::getquote
   my @Args = @_;
   # This uses the 'return an entire array' approach of Finance::YahooQuote.
-  my (@NA,@EU,@SG,@Res);	# arrays of symbols by server, and for results
+  my (@NA,@EU,@UK,@SG,@Res);	# arrays of symbols by server, and for results
   my $na = "N/A";
   foreach $ARG (@Args) {		# sort stock symbol
     if (IsAsiaAustraliaNZ($ARG)) {	# if it's Asian, Australian or NZ
@@ -186,7 +208,8 @@ sub GetDailyData {		# use Finance::YahooQuote::getquote
 
   # (Continental) European quotes
   if ($#EU > -1) { 		# if there are stocks for Yahoo! UK
-    my $url = "http://finanzen.de.yahoo.com/d/quotes.csv" . 
+#    my $url = "http://finanzen.de.yahoo.com/d/quotes.csv" . 
+    my $url = "http://de.finance.yahoo.com/d/quotes.csv" . 
       "?f=snl1d1t1c1p2vpoghx&s=" ; 
     my $array = GetQuote($url, @EU);
     foreach my $r (@$array) {
@@ -229,7 +252,8 @@ sub GetFXMaps {
 		   "EUR" => "^XEU",
 		   "GBP" => "^XBP",
 		   "JPY" => "^XJY",
-		   "USD" => "----"
+		   "USD" => "----",
+		   "DEM" => "^XDM"
 	      );
   my %yahoo2iso = (
 		   "^XAD" => "AUD",
@@ -238,17 +262,18 @@ sub GetFXMaps {
 		   "^XEU" => "EUR",
 		   "^XBP" => "GBP",
 		   "^XJY" => "JPY",
-		   "----" => "USD"
+		   "----" => "USD",
+		   "^XDM" => "DEM"
 	      );
-  return (%iso2yahoo, %yahoo2iso);
+  return (\%iso2yahoo, \%yahoo2iso);
 }
 
 
 sub GetHistoricalData {		# get a batch of historical quotes from Yahoo!
   my ($symbol,$from,$to) = @_;
-  my $ua = new LWP::UserAgent;  # Create a user agent object
-  $ua->agent("AgentName/0.1 " . $ua->agent);
-
+  my $ua = RequestAgent->new;
+  $ua->env_proxy;		# proxy settings from *_proxy env. variables.
+  $ua->proxy('http', $Config{proxy}) if $Config{proxy};  # or config vars
   my ($a,$b,$c,$d,$e,$f);	# we need the date as yy, mm and dd
   ($c,$a,$b) = ($from =~ m/\d\d(\d\d)(\d\d)(\d\d)/);
   ($f,$d,$e) = ($to =~ m/\d\d(\d\d)(\d\d)(\d\d)/);
@@ -263,46 +288,75 @@ sub GetHistoricalData {		# get a batch of historical quotes from Yahoo!
   }
 }
 
-
 sub GetPriceData {
-  my ($dbh, $date) = @_;
+  my ($dbh, $date, $res) = @_;
 
-  my $stmt = qq{select distinct i.symbol, i.name, 
-		                p.shares, p.currency, 
-				d.day_close, previous_close
+  my ($stmt, $sth, $rv, $ary_ref, $sym_ref, %dates);
+  my ($ra, $symbol, $name, $shares, $currency, $price, $prevprice,
+      %prices, %prev_prices, %shares, %fx, %name, %purchdate, %cost,
+      $cost,$pdate,%pricedate);
+
+  # get the symbols
+  $stmt  = "select distinct symbol from portfolio ";
+  $stmt .= "where $res " if (defined($res));
+  $stmt .= "order by symbol";
+  $sth = $dbh->prepare($stmt);
+  $rv = $sth->execute(); 	# run query for report end date
+  $sym_ref = $sth->fetchall_arrayref;
+
+  # for each symbol, get most recent date subject to supplied date
+  $stmt  = qq{select max(date) from stockprices 
+	      where symbol = ? and date <= ?
+	     };
+  $sth = $dbh->prepare($stmt);
+  foreach $ra (@$sym_ref) {		
+    $rv = $sth->execute($ra->[0], $date); # run query for report end date
+    my $res = $sth->fetchrow_array;
+    #print "$ra->[0] $res\n";
+    $dates{$ra->[0]} = $res;
+  }
+
+  # now get closing price etc at date
+  $stmt =    qq{select i.symbol, i.name, p.shares, p.currency, 
+		       d.day_close, p.cost, p.date, d.previous_close
 		from stockinfo i, portfolio p, stockprices d 
 		where d.symbol = p.symbol 
-		and d.date = ?
 		and i.symbol = d.symbol  
-		and d.symbol in (select distinct symbol from portfolio)
-		order by name;
+		and d.date = ?
+		and d.symbol = ?
 	       };
-  my $sth = $dbh->prepare($stmt);
-  my $rv = $sth->execute($date); 	# run query for report end date
-  my $ary_ref = $sth->fetchall_arrayref;
-  my ($ra, $symbol, $name, $shares, $currency, $price, $prevprice,
-      %prices, %prev_prices, %shares, %fx);
-  foreach $ra (@$ary_ref) {		
-    ($symbol, $name, $shares, $currency, $price, $prevprice) = @$ra;
-    $fx{$name} = $currency;
-    $prices{$name} = $price;
-    $prev_prices{$name} = $prevprice;
-    $shares{$name} = $shares;
+  $stmt .= "and $res " if (defined($res));
+  $sth = $dbh->prepare($stmt);
+  my $i = 0;
+  foreach $ra (@$sym_ref) {		
+    $rv = $sth->execute($dates{$ra->[0]}, $ra->[0]); 
+    while (($symbol, $name, $shares, $currency, $price, 
+	    $cost, $pdate, $prevprice) = $sth->fetchrow_array) {
+      $fx{$name} = $currency;	
+      $prices{$name} = $price;
+      $pricedate{$name} = $dates{$symbol};
+      $cost{$name} = $cost;
+      $purchdate{$name} = $pdate;
+      $prev_prices{$name} = $prevprice;
+      $name .= ":$i";
+      $i++;
+      $shares{$name} = $shares;
+    }
   }
   $sth->finish;
-  return (\%fx, \%prices, \%prev_prices, \%shares);
+  return (\%fx, \%prices, \%prev_prices, \%shares, \%pricedate, 
+	  \%cost, \%purchdate);
 }
-
 
 sub GetFXData {
   my ($dbh, $date, $fx) = @_;
-
   my $stmt = qq{ select day_close, previous_close
 		 from fxprices 
 		 where date = ?
 		 and currency = ?
 	       };
   my $sth = $dbh->prepare($stmt);
+  my (%fx_prices,%prev_fx_prices);
   foreach my $fxval (sort values %$fx) {
     if ($fxval eq "USD") {	
       $fx_prices{$fxval} = 1.0;
@@ -310,7 +364,7 @@ sub GetFXData {
     } else {
       $sth->execute($date,$fxval);	# run query for FX cross
       my ($val,$prevval) = $sth->fetchrow_array
-	or croak "Could not fetch $fx for $date";
+	or croak "Could not fetch $fxval for $date";
       $fx_prices{$fxval} = $val;
       $prev_fx_prices{$fxval} = $prevval;
       my $ary_ref = $sth->fetchall_arrayref;
@@ -349,6 +403,12 @@ sub DatabaseDailyData {		# a row to the dailydata table
   my ($dbh, %hash) = @_;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     print "$hash{$key}{symbol} " if $Config{verbose};
+
+    if ($hash{$key}{date} ne $Config{today}) {
+      carp "Ignoring $hash{$key}{symbol} with date $hash{$key}{date}";
+      next;
+    }
+
     my $cmd = "insert into stockprices values (" . 
               "'$hash{$key}{symbol}'," . 
 	      "'$hash{$key}{date}'," .
@@ -373,10 +433,10 @@ sub DatabaseFXDailyData {
   my ($dbh, %hash) = @_;
   my $stmt = qq{insert into fxprices values (?, ?, ?, ?, ?, ?, ?, ?);};
   my $sth = $dbh->prepare($stmt);
-  my (%iso2yahoo,%yahoo2iso) = GetFXMaps;
+  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
-    my $fx = $iso2yahoo{$hash{$key}{symbol}};
-    print "$fx ($hash{$key}{symbol})  " if $Config{verbose};
+    my $fx = $yahoo2iso->{$hash{$key}{symbol}};
+    print "$fx ($hash{$key}{symbol})  " if $Config{debug};
     $sth->execute($fx, 
 		  $hash{$key}{date}, 
 		  $hash{$key}{previous_close},
@@ -386,7 +446,7 @@ sub DatabaseFXDailyData {
 		  $hash{$key}{close},
 		  $hash{$key}{change}
 		 )
-      or croak "Failed for $hash{$key}{symbol}";
+      or carp "\nFailed for $fx at $hash{$key}{date}";
   }
 }
 
@@ -597,48 +657,66 @@ sub ReportDailyData {		# detailed display / debugging routine
 
 
 sub UpdateDatabase {		# update content in the db at end of day
-  my ($dbh, $sqlres) = @_;
+  my ($dbh, $res) = @_;
   my ($stmt, $sth, $rv, $ra, @symbols);
-
+  
   $stmt = qq{  select distinct symbol
-	       from stockinfo
-	       where symbol != ''
-	       $sqlres
-	       order by symbol;
-	     };
+	       from portfolio p
+	       where symbol != '' };
+  $stmt .= "   and $res " if (defined($res));
+  $stmt .= " order by symbol;";
+
   $sth = $dbh->prepare($stmt);
   $rv = $sth->execute;
   my $ary_ref = $sth->fetchall_arrayref;
   foreach $ra (@$ary_ref) {
-    print "$ra->[0] " if $verbose;
+    print "$ra->[0] " if $Config{verbose};
     push @symbols, $ra->[0];	# collect all the symbols affected 
   }
   $sth->finish;
   my @arr = GetDailyData(@symbols);	# retrieve _all_ the data
   my %data = ParseDailyData(@arr);
-  ReportDailyData(%data) if $verbose;
+  ReportDailyData(%data) if $Config{verbose};
   UpdateInfoData($dbh, %data);
   DatabaseDailyData($dbh, %data);
 }
 
 
 sub UpdateFXDatabase {
-  my ($dbh, $sqlres) = @_;
+  my ($dbh, $res) = @_;
 
-  my (%iso2yahoo,%yahoo2iso) = GetFXMaps;
-  my $stmt = qq{ select distinct currency from portfolio; };
+  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
+
+  # get all non-USD symbols (no USD as we don't need a USD/USD rate)
+  my $stmt = qq{  select distinct currency
+		  from portfolio 
+		  where symbol != '' 
+		  and currency != 'USD'
+	    };
+  $stmt .= "   and $res " if (defined($res));
   my $sth = $dbh->prepare($stmt);
   my $rv = $sth->execute;
   my $ary_ref = $sth->fetchall_arrayref;
   my @symbols = ();
-  foreach $ra (@$ary_ref) {
-    push @symbols, $iso2yahoo{$ra->[0]}
-      if ($ra->[0] ne "USD");
+  foreach my $ra (@$ary_ref) {
+    print "$ra->[0]\n" if $Config{debug};
+#    foreach my $key (keys %$yahoo2iso) {
+#      push @symbols, $key if ($key ne "----");
+#    }
+    push @symbols, $iso2yahoo->{$ra->[0]};	
   }
-  my @arr = GetDailyData(@symbols);	# retrieve _all_ the data
-  my %data = ParseDailyData(@arr);
-  ReportDailyData(%data) if $verbose;
-  DatabaseFXDailyData($dbh, %data);
+  if ($Config{extrafx}) {
+    foreach my $arg (split /,/, $Config{extrafx}) {
+      push @symbols, $iso2yahoo->{$arg};	
+    }
+  }
+  $sth->finish;
+  if (scalar(@symbols) > 0) {	# if there are FX symbols
+    my @arr = GetDailyData(@symbols); # retrieve _all_ the data
+    my %data = ParseDailyData(@arr);
+    ReportDailyData(%data) if $Config{verbose};
+    DatabaseFXDailyData($dbh, %data);
+  }
 }
 
 
@@ -657,7 +735,7 @@ sub UpdateInfoData {		# update a row in the info table
     $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
     print "$cmd\n" if $Config{debug};
     print "$hash{$key}{symbol} " if $Config{verbose};
-    $dbh->do($cmd) or warn "\nFailed for $hash{$key}{symbol} with $cmd\n";
+    $dbh->do($cmd) or carp "\nFailed for $hash{$key}{symbol} with $cmd";
   }
 }
 
@@ -850,9 +928,13 @@ The I<portfolio> table contains contains the holdings information:
 
 	    symbol   		varchar(16) not null,
 	    shares		float4,
-	    currency		varchar(12)
+	    currency		varchar(12),
+	    type		varchar(16),
+	    owner		varchar(16),
+	    cost		float(4),
+	    date		date
 
-It is indexed on I<symbol>.
+It is indexed on I<symbol,owner,date>.
 
 =head2 THE INDICES TABLE
 
@@ -904,4 +986,6 @@ American quotes which was already very useful for the real-time ticker
 F<http://rosebud.sps.queensu.ca/~edd/code/smtm.html>.
 
 =cut
+
+
 

@@ -61,7 +61,13 @@
      stocks comprising a market index.
    
    o "addportfolio sym1:nb1:fx sym2:nb:fx ..." fills the portfolio table with
-     the specified quantities of the specified stocks.
+     the specified quantities (eg 'nb1' or 'nb2' in the example above) of the
+     specified stocks. Additional attributes of the holding can be specified
+     as well. These are 'type' in which one could store the tax
+     classification of a retirement account, eg 'rrsp' in Canada or '401k' in
+     the USA, 'holder' which can carry the name of the account holder so that
+     one could e.g. differentiate between spousal accounts, 'cost' which 
+     stores the purchase price and 'purchasedate' for the time of the purchase.
    
    o "addstock sym1 sym2 ..." to  add one (or several) stock(s) to the
      database by filling both the 'stockinfo' table with general company and 
@@ -82,12 +88,15 @@
    o "plreport" runs an end-of-day profit/loss report on the portfolio.
       It can be run automatically by cron(8) via an entry in crontab(5) 
       such as 
-		 15 17 * * 1-5	  beancounter update && beancounter plreport
+	 15 17 * * 1-5	  beancounter update && beancounter plreport
      It can be run from cron(8) just after 'daily_update.pl'.
 
    o "quote sym1 sym2 ..." retrieves price info from the Web and displays
      it without touching the database. This is useful for verifying a stock
      symbol as well the network status.
+
+   o "status" computes a holdings value and (annualized) return summary 
+     which also shows how long a stock has been held.
  
    o "update" updates the database with day-end information. It can be run
      automatically by cron(8) via an entry in crontab(5) such as 
@@ -102,8 +111,8 @@
 
 5. To Do
 
-   Lots. More error checking. More performance analytics. More markets. More
-   currencies. More documentation.
+   More error checking. More performance analytics. More markets. More
+   documentation. Maybe a GUI.
 
 
 6. Disclaimer (taken straight from the GPL)
@@ -139,4 +148,4 @@
 
 Dirk Eddelbuettel <edd@debian.org>
 
-$Id: README,v 1.2 2000/07/23 20:56:08 edd Exp edd $
+$Id: README,v 1.3 2000/11/25 13:32:13 edd Exp $

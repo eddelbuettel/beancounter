@@ -1,8 +1,7 @@
 
 		  Debian Installation Notes for beancounter
 
-On Debian 'potato' (aka Debian 2.2) system, the following steps are required
-for beancounter:
+On a Debian system, the following steps are required for beancounter to run:
 
 1. Install PostgreSQL (if it is not yet installed)
 
@@ -52,4 +51,9 @@ for beancounter:
 
 6. As the user running beancounter, run 'setup_beancounter'
 
-7. That's it!
+7. That's it! 
+
+As of November 2000, I have yet to test it on a current Debian 'unstable'
+release (with release-number-to-be 2.3 and codename 'woody'). There might be
+issues with Postgresql 7.* that I am not yet aware of. If the reader of these
+lines finds any, I would appreciate an email, preferably with some examples.

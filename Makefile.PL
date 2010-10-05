@@ -41,7 +41,8 @@ WriteMakefile(
 	       : ()
 	      ),
 	      EXE_FILES 	=> ['beancounter', 
-				    'setup_beancounter'],
+				    'setup_beancounter',
+				    'update_beancounter'],
 	      'dist'		=> { COMPRESS => "gzip -9f",
 				     SUFFIX => '.gz' }
 	     );

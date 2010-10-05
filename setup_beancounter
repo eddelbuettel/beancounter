@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.2 2000/07/22 21:49:13 edd Exp $
+#   $Id: setup_beancounter,v 1.3 2000/08/18 03:11:30 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -100,10 +100,15 @@ function create_tables()
 	create table portfolio (
 	    symbol   		varchar(16) not null,
 	    shares		float4,
-	    currency		varchar(12)
+	    currency		varchar(12),
+	    type		varchar(16),
+	    owner		varchar(16),
+	    cost		float(4),
+	    date		date
+	    
 	);
 	create unique index portfolio_pkey
-	    on portfolio (symbol);
+	    on portfolio (symbol, owner, date);
 
 	create table indices (
 	    symbol   		varchar(12) not null,

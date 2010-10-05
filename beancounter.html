@@ -16,6 +16,9 @@
 	<LI><A HREF="#OPTIONS">OPTIONS</A>
 	<LI><A HREF="#DESCRIPTION">DESCRIPTION</A>
 	<LI><A HREF="#EXAMPLES">EXAMPLES</A>
+	<LI><A HREF="#TUTORIAL">TUTORIAL</A>
+	<LI><A HREF="#MORE_DETAILED_COMMAND_DESCRIPTIO">MORE DETAILED COMMAND DESCRIPTION</A>
+	<LI><A HREF="#MORE_DETAILED_OPTION_DESCRIPTION">MORE DETAILED OPTION DESCRIPTION</A>
 	<LI><A HREF="#BUGS">BUGS</A>
 	<LI><A HREF="#SEE_ALSO">SEE ALSO</A>
 	<LI><A HREF="#COPYRIGHT">COPYRIGHT</A>
@@ -33,77 +36,289 @@ beancounter - Stock portfolio performance monitor tool
 <HR>
 <H1><A NAME="SYNOPSYS">SYNOPSYS</A></H1>
 <P>
-<PRE> beancounter [options] command [stock_symbol ...]
-</PRE>
+beancounter [options] command [command_arguments ...]
+
 <P>
 <HR>
 <H1><A NAME="COMMANDS">COMMANDS</A></H1>
 <P>
-<PRE> addindex index args         add stock(s) to market index 'indx'
- addportfolio arg:nb:fx ...  add nb stocks of arg to portfolio
- addstock arg ...            add stock(s) to database
- dailyjob                    combines 'update' and 'dayendreport' 
- dayendreport                combines 'update' and 'plreport' 
- deletestock arg ...         delete stock(s) from database
- destroydb                   delete the BeanCounter database
- backpopulate arg ...        fill with historic data for given stock(s)
- plreport                    run an end-of-day portfolio report
- quote arg ...               report current data for given stock(s)
- update                      update the database with day's data
+<PRE> addindex index args       add stock(s) to market index 'indx'
+ addportfolio sym:nb:fx:type:o:pp:pd ... 
+                           add 'nb' stocks of company with symbol 'sym'
+                           that are listed in currency 'fx' to the 
+                           portfolio with optional 'type' and 'owner'
+                           info, purchase price 'pp' and date 'pd'; 
+                           see below for a complete example
+ addstock arg ...          add stock(s) with symbol arg to the database
+ backpopulate  arg ...     fill with historic data for given stock(s)
+ dailyjob                  combines 'update' and 'dayendreport' 
+ dayendreport              combines 'update' and 'plreport' 
+ deletestock arg ...       delete stock(s) from database
+ destroydb                 delete the BeanCounter database
+ plreport                  run an end-of-day portfolio report
+ quote arg ...             report current data for given stock(s)
+ status                    status summary report for portfolio
+ update                    update the database with day's data
+ warranty                  display the short GNU GPL statement
 </PRE>
 <P>
 <HR>
 <H1><A NAME="OPTIONS">OPTIONS</A></H1>
 <P>
-<PRE> --help                      show this help
- --date date                 [ plreport ] report for this date (today)
- --prevdate date             [ plreport ] relative to this date (yesterday)
- --fromdate date             [ backpopulate ] start from this date (1/1/99)
- --todate date               [ backpopulate ] end at this date (yesterday)
+<PRE> --help                    show this help
+ --verbose                 more verbose operation, debugging
+ --date date               report for this date (today)
+ --prevdate date           relative to this date (yesterday)
+ --currency fx             set home currency
+ --restriction sql         impose SQL restriction
+ --extrafx fx1,fx2,...     additional currencies to load
+ --rcfile file             use different configuration file
 </PRE>
 <P>
 <HR>
 <H1><A NAME="DESCRIPTION">DESCRIPTION</A></H1>
 <P>
 <STRONG>beancounter</STRONG> analyses stock market data to evaluate portfolio performance. It has
-several modes. The first main mode is data gathering: both current data
-(e.g. end-of-day closing prices) and historical price data (to
-backpopulate) can be retrieved and are automatically stored in a relational
-database. The second main mode is data analysis where the stored data is
-evaluated to provide performance information.
+several modes of operation. The first main mode is data gathering: both
+current data (e.g. end-of-day closing prices) and historical price data (to
+back-populate the database) can be automatically retrieved and stored in a
+relational database (which is developed on PostgreSQL but should be easily
+portable to other database systems thanks to the Perl DBI layer). The
+second main mode is data analysis where the stored data is evaluated to
+provide performance information.
 
 <P>
-Data is retrieved from the Yahoo! Finance web sites. 
+Data is retrieved from the Yahoo! Finance web sites with support for North
+America (i.e. US and Canada), Europe (for the Continent as well as Great
+Britain), several Asian stock markets, Australia and New Zealand. New
+markets are easy to add by following the (fairly extensively commented)
+Perl code. Patches are welcome!
 
 <P>
-<STRONG>beancounter</STRONG> can also aggregate the change in value for the entire portfolio over
-arbitrary time horizons.
+<STRONG>beancounter</STRONG> can aggregate the change in value for the entire portfolio over arbitrary
+time horizons. Using the powerful date-parsing routine available to Perl,
+you can simply say 'from six months ago to today' (see below for examples).
 
 <P>
 <STRONG>beancounter</STRONG> has been written and tested under Linux. It should run under any standard
 Unix as long as the required Perl modules are installed, as as long as the
-DB (currently hardwired to PostgreSQL) is found.
+DB (currently only tested with PostgreSQL) is found.
 
 <P>
 <HR>
 <H1><A NAME="EXAMPLES">EXAMPLES</A></H1>
 <P>
-<PRE> beancounter addportfolio SUNW:100 IBM:50
- beancounter addstock CBOT LNUX RHAT COR.TO
- beancounter backpopulate --fromdate '1 year ago' \
-                          --todate 'friday 1 week ago' IBM SUNW HWP
- beancounter plreport --fromdate '1 month ago' --todate 'today'
+<PRE> beancounter addportfolio SUNW:100:USD:joe:401k:85.50:19991117 \
+                          IBM:100:USD:joe:401k:90.25:20000320  \
+                          SPY:50:USD:joe:ira:142.25:20000620
 </PRE>
+<P>
+<PRE>    This adds the two stocks Sun and IBM to the 401k portfolio of Joe,
+    as well as SP500 'Spiders' to his IRA portfolio. The stocks are
+    also added to the general stock info tables. 
+</PRE>
+<P>
+<PRE> beancounter addstock LNUX RHAT COR.TO
+</PRE>
+<P>
+<PRE>    This adds these three Linux companies to the database without adding
+    them to any specific portfolios.
+</PRE>
+<P>
+<PRE> beancounter backpopulate --prevdate '1 year ago' \
+                          --date 'friday 1 week ago' IBM SUNW HWP
+</PRE>
+<P>
+<PRE>    This backpopulates the database with historic prices for three
+    hardware companies. Note how the date specification is very general.
+ 
+ beancounter plreport --prevdate '1 month ago' --date 'today' \
+                        --restriction &quot;owner='joe'&quot;
+</PRE>
+<P>
+<PRE>    This calculates portfolio profits or losses over the last year. It
+    also imposes the database restriction that only stocks owned by
+    'joe' are to be included.
+</PRE>
+<P>
+<PRE> beancounter status --restriction &quot;type='401k'&quot;
+</PRE>
+<P>
+<PRE>    This shows a portfolio status report with the restriction that only
+    stocks from the '401k' account are to be included.
+</PRE>
+<P>
+<HR>
+<H1><A NAME="TUTORIAL">TUTORIAL</A></H1>
+<P>
+The following few paragraphs will illustrate the use of
+<STRONG>beancounter</STRONG>. We will set up two fictional accounts for two brothers Bob and Bill (so
+that we can illustrate the 'owner' column). The prices below are completely
+ficticious, as are the portfolios.
+
+<P>
+We suppose that <STRONG>beancounter</STRONG> is installed and that the 'setup_beancounter' command has been run. We can
+then create a two-stock (computer hardware) portfolio for Bob as follows:
+
+<P>
+<PRE> beancounter addportfolio SUNW:100:USD:bob:401k:85.50:19991117 \
+                          IBM:100:USD:bob:401k:90.25:20000320
+</PRE>
+<P>
+Here we specify that 100 shares each of Sun and IBM, priced in US Dollars,
+are in Bob's portfolio which is tagged as a 401k retirement account. The
+(fictious) purchase price and date are also given.
+
+<P>
+Let's suppose that Bill prefers networking equipment, and that he has a
+brokerage account in Canada:
+
+<P>
+<PRE> beancounter addportfolio CSCO:100:USD:bill:spec:78.00:19990817 \
+                          NT:200:CAD:bill:spec:cad:90.25:20000212
+</PRE>
+<P>
+Now we can backpopulate the database from 1998 onwards for all four stocks:
+
+<P>
+<PRE> beancounter backpopulate --prevdate 19980101 CSCO IBM NT SUNW
+</PRE>
+<P>
+With this historical data in place, we now compare how Bob's portfolio
+would have fared over the last 18 months:
+
+<P>
+<PRE> beancounter plreport --prevdate '18 months ago' --restriction &quot;owner='bob'&quot;
+</PRE>
+<P>
+Note how we use double quotes to protect the arguments, and how the SQL
+restriction contains a further single quote around the literal string.
+
+<P>
+We can also review the performance for Bill at the most recent trading day:
+
+<P>
+<PRE> beancounter dayendreport --restriction &quot;owner='bill'&quot;
+</PRE>
+<P>
+or the status of holdings and their respective values:
+
+<P>
+<PRE> beancounter dayendreport --restriction &quot;owner='bill'&quot;
+</PRE>
+<P>
+<HR>
+<H1><A NAME="MORE_DETAILED_COMMAND_DESCRIPTIO">MORE DETAILED COMMAND DESCRIPTION</A></H1>
+<P>
+<STRONG>addportfolio</STRONG> is the most important 'position entry' command. As with other commands,
+several arguments can be given at the same time. For each of these, records
+are separated using a colon and specify, in order, stock symbol, number of
+stocks held, currency, account type, account owner, purchase price and
+purchase date. Only the first three arguments are required, the others are
+optional. Executing <STRONG>addportfolio</STRONG> implicitly executes <STRONG>addstock</STRONG>. The account type column can be used to specify whether the account is,
+e.g., a tax-sheltered retirement account, or it could be used to denote the
+brokerage company is it held at.
+
+<P>
+<STRONG>plreport</STRONG> retrieves the most recent <CODE>quotes(s).</CODE> This is useful for
+illiquid securities which might not have traded that day, or if a public
+holiday occurred, or if there was a data error at Yahoo!. Two dates can be
+specified which determine the period over which the profit or loss is
+computed. This will fail if price data (or currency data in the case of
+foreign stocks data) data is not available for either of those two dates.
+This can be restrictive for foreign stocks where we cannot backpopulate due
+to lack of public data source for historical currency quotes.
+
+<P>
+<STRONG>dayendreport</STRONG> is similar to <STRONG>plreport</STRONG> but is always over a one-day period. It also uses only one date record by
+calculating performance given the 'previous close' data.
+
+<P>
+<STRONG>status</STRONG> shows holdings amounts, total position values, annualized returns in
+percentages and holding periods in days. Note that the annualized returns
+can appear excessive if, e.g., a ten-day return from a recently purchased
+stock is extrapolated to an annual time period.
+
+<P>
+<STRONG>addindex</STRONG> adds stocks a the index table. Currently, no further analysis references
+this table.
+
+<P>
+<STRONG>addstock</STRONG> adds stocks to the database. From then on data will be retrieved for the
+given <CODE>symbol(s)</CODE> and stored in the database whenever the <STRONG>update</STRONG> command is executed.
+
+<P>
+<STRONG>addpopulate</STRONG> fills the database with historic prices for the given symbols and date
+period. Note that this works for stocks only, but not for currencies due to
+the lack of a public source of historical FX prices.
+
+<P>
+<STRONG>quote</STRONG> simply shows a price quote for the given <CODE>symbol(s).</CODE>
+
+<P>
+<STRONG>update</STRONG> updates the database with quotes for all stocks for the given day. No
+output is generated making the command suitable for 
+<STRONG>cron</STRONG> execution.
+
+<P>
+<STRONG>dailyjob</STRONG> is a simple wrapper around <STRONG>update</STRONG> and <STRONG>dayendreport</STRONG>.
+
+<P>
+<STRONG>deletestock</STRONG> removes the given symbols from the database.
+
+<P>
+<STRONG>destroydb</STRONG> deletes the BeanCounter database.
+
+<P>
+<STRONG>warranty</STRONG> display a short GNU General Public License statement.
+
+<P>
+<HR>
+<H1><A NAME="MORE_DETAILED_OPTION_DESCRIPTION">MORE DETAILED OPTION DESCRIPTION</A></H1>
+<P>
+<STRONG>--currency</STRONG> can be used to select a different <EM>home</EM> currency. Instead of having all values converted to the default currency,
+the selected currency is used.
+
+<P>
+<STRONG>--date</STRONG> allows to choose a different reference date. This is then be be used by
+commands working on a date, or date period, such as
+<STRONG>plreport</STRONG>, <STRONG>dayendreport</STRONG>, <STRONG>backpopulate</STRONG> or
+<STRONG>status</STRONG>. <STRONG>--prevdate</STRONG> allows to choose a different start date for return calculations, or data
+gathering.
+
+<P>
+<STRONG>--restriction</STRONG> can be used to restrict the database selection. The argument must be a
+valid part of valid SQL statement in the sense that existing columns and
+operators have to be employed. The argument to this option will be
+completed with a leading <EM>and</EM>. The SQL restriction will typcally be over elements of the <EM>portfolio</EM> table which comprises the columns <EM>symbol</EM>, <EM>shares</EM>, <EM>currency</EM>,
+<EM>type</EM>, <EM>owner</EM>, <EM>cost</EM> and <EM>date</EM>. A simple example would be
+<EM>currency='CAD'</EM>. Note that this has to protected by double quotes
+<EM>"I</EM> on the command-line.
+
+<P>
+<STRONG>--extrafx</STRONG> allows to gather data on additional currency rates beyond those
+automatically selected as shares are listed in them. A typical example
+would be for a European investor wanting to convert from the EUR in which
+the shares are listed into one of the member currencies which <STRONG>beancounter</STRONG> would no longer retrieve as shares are no longer listed in these.
+
+<P>
+<STRONG>--rcfile</STRONG> allows to specify a resource file different from the default <EM>~/.beancounterrc</EM>. 
+
+<P>
+The <STRONG>--verbose</STRONG> and <STRONG>--debug</STRONG> switches can be used in debugging an testing, and <STRONG>--help</STRONG> triggers the display of help message. 
+
 <P>
 <HR>
 <H1><A NAME="BUGS">BUGS</A></H1>
 <P>
-<STRONG>Finance::BeanCounter</STRONG> and <STRONG>beancounter</STRONG> are so fresh that there are only missing features right now :) Seriously,
-check the TODO list.
+<STRONG>Finance::BeanCounter</STRONG> and <STRONG>beancounter</STRONG> are so fresh that there are only missing features :) Seriously, check the
+TODO list. This code or its predecessors have been used by the author since
+the end of 1998.
 
 <P>
-On a more serious note, this code or its predecessors have been used by the
-author for a good year and a half now.
+There might be issues with Perl 5.6 and PostgreSQL 7.* which have yet to be
+installed on the machines the author is running <STRONG>beancounter</STRONG>
+on.
 
 <P>
 <HR>

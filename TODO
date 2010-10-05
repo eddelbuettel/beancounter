@@ -2,6 +2,7 @@
 * stock splits
 
 * annualised returns
+  [now done in status command] ]
 
 * clean up code
 
@@ -9,8 +10,18 @@
 
 * read more info from the rc file ~/.beancounterrc such as host, 
   port, user, ... 
+  [ partly done ]
 
 * allow "restrictions" on beancounter operations, eg do a portfolio update at
   13:00 EST with the restriction of doing it only for shares with currencies
   that are GBP or EUR (or SEK or DKK ...) to get the European market
+  [ done, also added 'extrafx' argument ]
+
+* there is buglet that rears its head when a stock is added to portfolio 
+  during business hours as its current price is also added for that day ...
+  which creates a conflict when that stock is later updated during the normal
+  update. This is difficult to circumvent as we don't want to reinvent
+  cron within beancounter. Either we do update for the current day (as we do
+  now, which has the problem) or don't (in which case we might never get that
+  datum if we updated after the daily cron run)
 

@@ -1,3 +1,20 @@
+beancounter (0.2.0) unstable; urgency=low
+
+  * New release with the following code changes
+    - new table columns 'owner' and 'holder' for portfolio allow
+      to differentiate between different accounts and users
+    - SQL restrictions can be imposed for finer-grained analysis
+    - new status command for portfolio return and holding overview
+    - extrafx argument allows to specify additional currencies to
+      be downloaded and stored by the 'update' command
+    - date and prevdate default to today and yesterday
+    - fromdate and todate options replaced by consistent use
+      of date and fromdate
+    - more documentation
+    - data display layout changed
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Sat,  2 Dec 2000 17:27:48 -0600
+
 beancounter (0.1.1) unstable; urgency=low
 
   * Bugfix release:
