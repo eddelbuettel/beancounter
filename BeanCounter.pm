@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.91 2006/01/26 16:26:26 edd Exp $
+#  $Id: BeanCounter.pm,v 1.94 2006/02/16 03:10:36 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -74,7 +74,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.91 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.94 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -85,7 +85,9 @@ sub BeanCounterVersion {
 
 
 sub ConnectToDb {		# log us into the database (PostgreSQL)
-  my $dbh = undef;
+  my $dbh = undef, $hoststr = "";
+
+  $hoststr = ";host=$Config{host}" unless $Config{host} eq "localhost";
 
   if ($Config{odbc}) {
     $dbh = DBI->connect("dbi:ODBC:$Config{dsn}",
@@ -94,13 +96,13 @@ sub ConnectToDb {		# log us into the database (PostgreSQL)
 			  Warn => $Config{verbose}, 
 			  AutoCommit => 0 });
   } elsif (lc $Config{dbsystem} eq "postgresql") {
-    $dbh = DBI->connect("dbi:Pg:dbname=$Config{dbname};host=$Config{host}",
+    $dbh = DBI->connect("dbi:Pg:dbname=$Config{dbname}" . $hoststr,
 			$Config{user}, $Config{passwd},
 			{ PrintError => $Config{debug}, 
 			  Warn => $Config{verbose}, 
 			  AutoCommit => 0 });
   } elsif (lc $Config{dbsystem} eq "mysql") {
-    $dbh = DBI->connect("dbi:mysql:dbname=$Config{dbname};host=$Config{host}",
+    $dbh = DBI->connect("dbi:mysql:dbname=$Config{dbname}" . $hoststr,
 			$Config{user}, $Config{passwd},
 			{ PrintError => $Config{debug}, 
 			  Warn => $Config{verbose}, 
@@ -185,7 +187,7 @@ sub GetTodaysAndPreviousDates {
 sub GetConfig {
   my ($file, $debug, $verbose, $fx, $extrafx, $updatedate,
       $dbsystem, $dbname, $fxupdate, $commit, $equityupdate, 
-      $ubcfx, $command) = @_;
+      $ubcfx, $hostarg, $command) = @_;
 
   %Config = ();			# reset hash
 
@@ -207,9 +209,6 @@ sub GetConfig {
 
   # DSN name for ODBC
   $Config{dsn} = "beancounter";	# default ODBC data source name
-
-  # host is needed only for the DBI-Pg or DBI-mysql interface
-  $Config{host} = "localhost";	# default to local machine
 
   # default to updating FX
   if ($fxupdate) {
@@ -258,6 +257,10 @@ sub GetConfig {
   $Config{dbname} = $dbname if defined($dbname);
   $Config{dbsystem} = $dbsystem if defined($dbsystem);
   $Config{odbc} = 1 if defined($dbsystem) and lc $dbsystem eq "odbc";
+
+  # host is needed only for the DBI-Pg or DBI-mysql interface
+  $Config{host} = $hostarg if defined($hostarg);	# default localhost 
+
 
   if (defined($extrafx)) {
     unless ($command =~ /^(update|dailyjob)$/) {
@@ -949,8 +952,10 @@ sub GetRiskData {
   my $sum = 0;
   foreach my $pkey (keys %pos) {
     foreach my $vkey (keys %vol) { 
-      $sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} 
-	* $cor{$vkey}{$pkey};
+      if (defined($vol{$vkey}) and defined($vol{$pkey})) {
+	 $sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} * 
+	     $cor{$vkey}{$pkey};
+      }
     }
   }
   my $var = $crit * sqrt($sum);
@@ -1038,6 +1043,10 @@ sub DatabaseFXDailyData {
   my ($dbh, %hash) = @_;
   my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
+    if ($key eq "") {
+ 	print "Empty key in DatabaseFXDailyData, skipping\n" if $Config{debug};
+	next;
+    }
     my $fx = $yahoo2iso->{$hash{$key}{symbol}};
     print "$fx ($hash{$key}{symbol})  " if $Config{debug};
     if (ExistsFXDailyData($dbh, $fx, %{$hash{$key}})) {

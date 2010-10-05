@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.82 2006/01/26 16:25:48 edd Exp $
+#   $Id: beancounter,v 1.83 2006/02/16 03:09:04 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -30,21 +30,22 @@ use Getopt::Long;		# long options
 use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg 
 	    $rcfile $sqlrestriction $extrafx $updatedate
 	    $dbsystem $dbname $fxupdate $commit $equityupdate
-	    $ubcfx $splitby);
+	    $hostarg $ubcfx $splitby);
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.82 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.83 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.3";		# updated from the debian/rules Makefile
+my $version = "0.8.4";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2006/01/26 16:25:48 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2006/02/16 03:09:04 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
 ($prevdatearg, $datearg, $equityupdate, $fxupdate, $commit, 
-	       $ubcfx, $splitby) = ("6 month ago", "today", 1, 1, 1, 0, 2);
+ $ubcfx, $splitby, $hostarg) = 
+    ("6 month ago", "today", 1, 1, 1, 0, 2, "localhost");
 
 my %options = ("help" 		=> \$help,
 	       "debug"		=> \$debug,
@@ -61,6 +62,7 @@ my %options = ("help" 		=> \$help,
 	       "fxupdate!"	=> \$fxupdate,
 	       "equityupdate!"	=> \$equityupdate,
 	       "splitby=s"	=> \$splitby,
+	       "host=s"		=> \$hostarg,
 	       "ubcfx!"		=> \$ubcfx,
 	       "verbose"	=> \$verbose);
 
@@ -72,7 +74,8 @@ my $command = shift @ARGV;
 my %Config = GetConfig($rcfile, $debug, $verbose, $fxarg,
 		       $extrafx, $updatedate, $dbsystem, $dbname, 
 		       $fxupdate, $commit, $equityupdate, $ubcfx,
-		       $command);
+		       $hostarg, $command);
+
 my $dbh = ConnectToDb();
 
 if (TestInsufficientDatabaseSchema($dbh, $db_min_schema)) {
@@ -205,7 +208,7 @@ Options:
     --[no]commit	        enforce/suppress database update [commit]
     --[no]equityupdate 		enforce/suppress Equity update, [update]
     --[no]ubcfx 		use/skip FX from UBC's Sauder school [skip]
-    --splitby arg               split stock history + position by this factor [2]
+    --splitby arg               split stock history + position by factor [2]
     --rcfile file		use different configuration file
     --dbsystem system		use db backend system, default is PostgreSQL
     --dbname name		use db name, default is beancounter
@@ -734,10 +737,10 @@ sub portfolio_retracement {
 
   my $text = ($mode eq "advance") ? "Advances" : "Retracement";
 
-  my ($tl,$fl) = build_lines(80);
+  my ($tl,$fl) = build_lines(79);
   my ($totaldown, $weightedup, $assetbase) = (0,0,0);
   print "$tl\n";
-  printf("%-18s", $text);
+  printf("%-17s", $text);
   print " shares    price    value   $prev_date to $date  unreal. ";
   print "" . ($mode eq "advance") ? "gain" : "loss";
   print "\n$fl\n";
@@ -752,7 +755,7 @@ sub portfolio_retracement {
     $downperc = $prices->{$ARG}/$refprice - 1;
     $downamount = $totalshares{$ARG} * ($prices->{$ARG} - $refprice)
       * $fx_prices->{$fx->{$ARG}} / $fx_prices->{$Config{currency}};
-    printf("%-18s %6d %8.2f %10.2f %8.2f %10.2f%%  %12.2f\n",
+    printf("%-17s %6d %8.2f %10.2f %8.2f %10.2f%%  %12.2f\n",
 	   substr($ARG, 0, 17), 
 	   $totalshares{$ARG}, $prices->{$ARG}, $value{$ARG},
 	   $refprice, 100*$downperc, $downamount);
@@ -760,7 +763,7 @@ sub portfolio_retracement {
     $assetbase += $value{$ARG};
   }
   print "$fl\n";
-  printf("%-30s     %10.2f            %8.2f%% %13.2f\n",
+  printf("%-29s     %10.2f            %8.2f%% %13.2f\n",
 	 "Aggregate", $assetbase,
 	 100*$totaldown/$assetbase, $totaldown);
   print "$tl\n";
@@ -1535,9 +1538,16 @@ acquisition, maybe via www.oanda.com would be welcome.
 B<--splitby> can be used to set a stock split factor other than the default
 of 2.
 
-Also, B<--commit> is a boolean switch to suppress actual database
-updates if the negated B<--nocommit> is selected. This is useful
-mostly in debugging contexts.
+B<--host> can be used to point to a machine containing the PostgreSQL
+or MySQL database. The machine can be remote, or it can be the actual
+machine B<beancounter> is running on. If a hostname is given, tcp/ip
+connection are used. If no hostname is given, the default value of
+'localhost' implies that local socket connections are used which may
+be easier to employ for less experienced adatabase users. 
+
+Also, B<--commit> is a boolean switch to suppress actual
+database updates if the negated B<--nocommit> is selected. This is
+useful mostly in debugging contexts.
 
 The B<--verbose> and B<--debug> switches can be used in debugging an
 testing, and B<--help> triggers the display of help message. 

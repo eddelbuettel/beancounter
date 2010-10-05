@@ -54,11 +54,12 @@ perlrelease:
 	make dist
 	mv -v Finance-BeanCounter-$(version).tar.gz ..
 
-oldwebdir:
-ifneq ($(host),sonny)
-		@echo "This needs to run on sonny"
+webdir:
+ifneq ($(host),basebud)
+		@echo "This needs to run on basebud"
 		false
 endif
+	cp -vax /var/local/cache/pbuilder/result/$(package)_$(version)_all.deb ..
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
 		cd /tmp; \
 		fakeroot alien -r $(package)_$(version)_all.deb; \
@@ -84,12 +85,11 @@ endif
 		ln -sfv ChangeLog ChangeLog.txt	;	\
 		ln -sfv TODO TODO.txt 			)
 
-webdir:
-ifneq ($(host),basebud)
-		@echo "This needs to run on basebud"
+oldwebdir:
+ifneq ($(host),sonny)
+		@echo "This needs to run on sonny"
 		false
 endif
-	cp -vax /var/local/cache/pbuilder/result/$(package)_$(version)_all.deb ..
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
 		cd /tmp; \
 		fakeroot alien -r $(package)_$(version)_all.deb; \

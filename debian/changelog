@@ -1,3 +1,21 @@
+beancounter (0.8.4) unstable; urgency=low
+
+  * Minor updates and fixes:
+
+    o [BeanCounter.pm] Additional check against empty currency name.
+  
+    o [beancounter] New command 'host' to define hostname for database
+      server on command-line (as well as via ~/.beancounterrc). 
+
+    o [BeanCounter.pm] If hostname is equal to the default 'localhost',
+      do not connect via tcp/ip to PostgreSQL or MySQL but just use 
+      sockets. This may help new users who are unsure how to make 
+      their database engines network-aware.
+   
+    o [beancounter] Advances/retracement display now in 79 columns.  
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Sun, 19 Feb 2006 21:41:27 -0600
+
 beancounter (0.8.3) unstable; urgency=low
 
   * Minor updates and fixes:
@@ -19,7 +37,7 @@ beancounter (0.8.3) unstable; urgency=low
     o [BeanCounter.pm] New function DatabaseHistoricalUCBFX
       for historical FX backpopulation via the service at the Sauder 
       School of UBC in Vancouver. New function GetFXDatum for a single
-      FX data itme.
+      FX data item.
     
     o [BeanCounter.pm] Renamed UpdateFXviaPACIFIC to UpdateFXviaUBC
   
@@ -30,8 +48,6 @@ beancounter (0.8.3) unstable; urgency=low
       switching CAD's symbol from ^XAD to ^XAY), but still no backpopulation
       capabilities at Yahoo!, and not entirely satisfied with UBC's service
       either.
-  
-    o [beancounter] New command and function lsportfolio 
   
     o [BeanCounter.pm, beancounter] Minor variable renaming and cleanups.
 

@@ -423,9 +423,15 @@ it cannot really server as a full substitute. Contributions for a new data
 acquisition, maybe via www.oanda.com would be welcome.</p>
 <p><strong>--splitby</strong> can be used to set a stock split factor other than the default
 of 2.</p>
-<p>Also, <strong>--commit</strong> is a boolean switch to suppress actual database
-updates if the negated <strong>--nocommit</strong> is selected. This is useful
-mostly in debugging contexts.</p>
+<p><strong>--host</strong> can be used to point to a machine containing the PostgreSQL
+or MySQL database. The machine can be remote, or it can be the actual
+machine <strong>beancounter</strong> is running on. If a hostname is given, tcp/ip
+connection are used. If no hostname is given, the default value of
+'localhost' implies that local socket connections are used which may
+be easier to employ for less experienced adatabase users.</p>
+<p>Also, <strong>--commit</strong> is a boolean switch to suppress actual
+database updates if the negated <strong>--nocommit</strong> is selected. This is
+useful mostly in debugging contexts.</p>
 <p>The <strong>--verbose</strong> and <strong>--debug</strong> switches can be used in debugging an
 testing, and <strong>--help</strong> triggers the display of help message.</p>
 <p>
@@ -576,7 +582,7 @@ its predecessors have been used by the author since the end of 1998.</p>
 </p>
 <hr />
 <h1><a name="copyright">COPYRIGHT</a></h1>
-<p>beancounter is (c) 2000 - 2005 by Dirk Eddelbuettel &lt;<a href="mailto:edd@debian.org">edd@debian.org</a>&gt;</p>
+<p>beancounter is (c) 2000 - 2006 by Dirk Eddelbuettel &lt;<a href="mailto:edd@debian.org">edd@debian.org</a>&gt;</p>
 <p>Updates to this program might appear at 
 <em><a href="http://dirk.eddelbuettel.com/code/beancounter.html">http://dirk.eddelbuettel.com/code/beancounter.html</a></em>.</p>
 <p>This program is free software; you can redistribute it and/or modify
