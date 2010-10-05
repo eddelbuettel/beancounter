@@ -1,3 +1,12 @@
+beancounter (0.5.1) unstable; urgency=low
+
+  * setup_beancounter: Fill beancounter table with current version number 
+    and current date right after the table is created. 
+  * debian/rules: Making sure $version is updated in beancounter, 
+    update_beancounter and setup_beancounter
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Sun, 10 Mar 2002 19:38:57 -0600
+
 beancounter (0.5.0) unstable; urgency=low
 
   * New release with the following new features:

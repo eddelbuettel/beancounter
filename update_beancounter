@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: update_beancounter,v 1.6 2002/02/12 05:39:20 edd Exp edd $
+#   $Id: update_beancounter,v 1.8 2002/03/11 01:49:46 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -32,7 +32,7 @@ then
     USER=$(whoami)
 fi
 
-VERSION=0.5.0
+VERSION='0.5.0'
 #DATABASE='testbean'
 DATABASE='beancounter'
 #PASSWORD=

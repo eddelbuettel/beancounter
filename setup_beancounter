@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.16 2002/02/12 05:28:21 edd Exp $
+#   $Id: setup_beancounter,v 1.18 2002/03/11 02:05:26 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -42,6 +42,7 @@ then
 fi
 
 DATABASE='beancounter'
+VERSION='0.5.0'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'
@@ -89,6 +90,7 @@ function create_mysql_tables()
 	version			varchar(12) not null,
    	data_last_updated	datetime
     );
+    insert into beancounter values ('$VERSION', 'now');
 
     CREATE TABLE fxprices (
 	currency varchar(12) NOT NULL default '',
@@ -170,6 +172,7 @@ function create_postgres_tables()
 	    version		varchar(12) not null,
    	    data_last_updated	datetime
 	);
+	insert into beancounter values('$VERSION', 'now');
 
 	create table stockinfo (
 	    symbol   		varchar(12) not null default '',

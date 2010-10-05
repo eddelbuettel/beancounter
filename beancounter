@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.31 2002/03/02 04:19:22 edd Exp $
+#   $Id: beancounter,v 1.32 2002/03/10 21:41:58 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -34,11 +34,11 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.31 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.32 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.1.9";		# updated from the debian/rules Makefile
+my $version = "0.5.0";		# updated from the debian/rules Makefile
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2002/03/02 04:19:22 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2002/03/10 21:41:58 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 

@@ -8,6 +8,7 @@ Adrian Johnson <asj@bigpond.net.au>
         for also spotting this, and a few more buglets leading to 0.2.1
 Evelyn Mitchell <efm@tummy.com>
         for pointing out the need for additional $dbh->commit() calls
+        and for the missing beancounter table insert in setup_beancounter
 Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
 	for initial MySQL patches, numerous design discussions + suggestions
         and the patch to allow 'update' to either insert or update

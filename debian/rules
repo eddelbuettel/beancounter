@@ -55,15 +55,20 @@ webdir:
 build: build-stamp
 build-stamp:
 	dh_testdir
-	#$(PERL) Makefile.PL $(config)
+
+        # update the $$version field in the perl code as well as in
+        # the two support script
+	perl -p -i -e \
+		"s/version = \".*\";/version = \""$(version)"\";/" $(package)
+	for i in setup_beancounter update_beancounter; do \
+	   perl -p -i -e "s/VERSION='.*'/VERSION='"$(version)"'/" $$i; \
+	done
+        #$(PERL) Makefile.PL $(config)
 	perl Makefile.PL INSTALLDIRS=vendor	
 	pod2html --flush $(package) > $(package).html
 	pod2html --flush BeanCounter.pm > BeanCounter.html
-#	pod2man          $(package) > $(package).1
+        #pod2man          $(package) > $(package).1
 	$(MAKE)
-	# update the $$version field in the perl code
-	perl -p -i -e \
-		"s/version = \".*\";/version = \""$(version)"\";/" $(package)
 	touch build-stamp
 
 clean:
@@ -78,25 +83,25 @@ binary-indep: build
 	dh_testdir
 	dh_testroot
 	dh_clean -k
-#	dh_installdirs		usr/bin usr/share/man/man1
-#	dh_installdirs		usr/bin 
-	#$(MAKE) 		prefix=$(debtmp)/usr pure_install
+        #dh_installdirs		usr/bin usr/share/man/man1
+        #dh_installdirs		usr/bin 
+        #$(MAKE) 		prefix=$(debtmp)/usr pure_install
 	$(MAKE) 		install PREFIX=$(debtmp)/usr
 	dh_perl	
 	dh_installdocs		THANKS TODO README README.Debian
 	dh_installexamples	example.beancounterrc 
-#	dh_installmenu
-#	dh_installinit
-#	dh_installcron
+        #dh_installmenu
+        #dh_installinit
+        #dh_installcron
 	dh_installmanpages	
-#	dh_undocumented		setup_beancounter.1 update_beancounter.1
+        #dh_undocumented	setup_beancounter.1 update_beancounter.1
 	dh_installchangelogs	
 	dh_compress
 	dh_fixperms
-#	dh_suidregister
+        #dh_suidregister
 	dh_installdeb
 	dh_gencontrol
-#	dh_md5sums
+        #dh_md5sums
 	dh_builddeb
 
 binary-arch: build
