@@ -1,3 +1,17 @@
+beancounter (0.7.5) unstable; urgency=low
+
+  *  Bug fix release 
+  
+     - [beancounter]: Correct documentation of 'passwd' option for db 
+       connection from 'password' to 'passwd'  (Closes: #255640)
+     
+     - [beancounter]: Add simple command 'checkdbconnection' that exits
+       with testable error code if db connection can be opened + closed
+  
+     - [setup_beancounter]: Make use of 'checkdbconnection' test 
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Thu, 24 Jun 2004 18:23:45 -0500
+
 beancounter (0.7.4) unstable; urgency=low
 
   *  Bug fix release with several contributed patches:
@@ -5,13 +19,16 @@ beancounter (0.7.4) unstable; urgency=low
      - [BeanCounter.pm]: Added portfolio export function GetPortfolioData which
        will eventually be used by smtm and others, provided by Kevin Kim
   
-     - [BeanCounter.pm]: Ensure proxy information is set, provided by Joao Costa
+     - [BeanCounter.pm]: Ensure proxy information is set, provided by Joao 
+       Costa
   
-     - [BeanCounter.pm]: Ensure data written to stockprices table has no NAs so 
-       good data should never be overwritten by bad data, also provided by Joao Costa
+     - [BeanCounter.pm]: Ensure data written to stockprices table has no NAs  
+       good data should never be overwritten by bad data, also provided by 
+       Joao Costa
 
-     - [beancounter]: Historical data from non-US exchanges needs to be retrieved
-       in patches of 200, implemented in patch provided by Matthew Jurgens
+     - [beancounter]: Historical data from non-US exchanges needs to be 
+       retrieved in patches of 200, implemented in patch provided by 
+       Matthew Jurgens
 
  -- Dirk Eddelbuettel <edd@debian.org>  Wed,  2 Jun 2004 21:19:52 -0500
 

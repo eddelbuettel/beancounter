@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.28 2004/01/24 23:48:33 edd Exp $
+#   $Id: setup_beancounter,v 1.30 2004/06/24 23:18:33 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -42,7 +42,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.7.4'
+VERSION='0.7.5'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'
@@ -548,6 +548,22 @@ if [ "$SCHEMA_ONLY" -eq 1 ]; then
     echo "Schema created, exiting"
     exit 0
 fi
+
+# testing database access from Perl
+echo "Verifying database access from Perl"
+set +e
+/tmp/beancounter checkdbconnection
+rc="$?"
+if [ "$rc" != 1 ]
+then
+#    echo "Successful, continuing"
+#else
+    echo "Failure -- please check database permission, possible requirement of"
+    echo "a password and other sources of failure to establish a connection."
+    exit 1
+fi
+set -e
+
 
 # insert the DJIA stocks into the indices table
 echo "Filling $DATABASE database tables with DJIA stocks"

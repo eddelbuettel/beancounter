@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+
 #
 #   beancounter --- A stock portfolio performance monitoring tool
 #
@@ -18,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.50 2004/05/28 02:42:25 edd Exp $
+#   $Id: beancounter,v 1.53 2004/06/24 23:23:25 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -32,12 +33,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.50 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.53 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.7.4";		# updated from the debian/rules Makefile
+my $version = "0.7.5";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2004/05/28 02:42:25 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2004/06/24 23:23:25 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -111,6 +112,11 @@ if (TestInsufficientDatabaseSchema($dbh, $db_min_schema)) {
     portfolio_status($sqlrestriction);
   } elsif ($command =~ /^update$/) {
     portfolio_update($sqlrestriction);
+  } elsif ($command =~ /^checkdbconnection$/) {
+    CloseDB($dbh) or die("Cannot close db handle!\n");
+    print "Successfully connected to database from beancounter script.\n"
+	if $Config{debug};
+    exit 1;
   } elsif ($command =~ /^warranty$/) {
     warranty();
   } else {
@@ -150,6 +156,7 @@ Commands:
     advancement  	        report unrealized gains from lows
     allreports			combines, dayendreport, status and risk
     backpopulate  symbol ...	fill with historic data for given stock(s)
+    checkdbconnection		test if connection to db can be established
     fxbackpopulate  symbol ...	fill with historic data for currency(ies)
     dailyjob			combines update, dayendreport, status + risk
     dayendreport		reports changes relative to the previous day
@@ -787,6 +794,7 @@ beancounter [options] command [command_arguments ...]
  addstock arg ...          add stock(s) with symbol arg to the database
  advancement  		   report on unrealized gains from lows
  backpopulate  arg ...	   fill with historic data for given stock(s)
+ checkdbconnection	   test if connection to db can be established
  dailyjob		   combines update, dayendreport, status + risk 
  dayendreport		   reports p/l changes relative to previous day
  delete arg ...	   	   delete given stock(s) from database
@@ -928,7 +936,7 @@ brothers Bob and Bill (so that we can illustrate the 'owner' column).
 The prices below are completely fictitious, as are the portfolios.
 
 We suppose that B<beancounter> is installed and that the
-'setup_beancounter' command has been run. We can then create a
+B<setup_beancounter> command has been run. We can then create a
 two-stock (computer hardware) portfolio for Bob as follows:
 
  beancounter addportfolio SUNW:100:USD:401k:bob:85.50:19991117 \
@@ -1075,6 +1083,10 @@ B<delete> removes the given symbols from the database.
 
 B<destroydb> deletes the BeanCounter database.
 
+B<checkdbconnection> simply opens and closes the database handle, and
+returns a specified exit code which can then be tested. This is used
+in the B<setup_beancounter> command.
+
 B<warranty> display a short GNU General Public License statement.
 
 =head1 MORE DETAILED OPTION DESCRIPTION
@@ -1171,7 +1183,7 @@ connection via the DBI-Pg driver in case DBI-ODBC is not used)
 =item I<user> to specify the userid for the database connection; if
 needed. If not specified, the current user id is used.
 
-=item I<password> to specify the password for the database connection,
+=item I<passwd> to specify the password for the database connection,
 if needed.
 
 =item I<dbsystem> to select a database backend, e.g. to switch from
@@ -1274,11 +1286,12 @@ its predecessors have been used by the author since the end of 1998.
 =head1 SEE ALSO
 
 F<Finance::BeanCounter.3pm>, F<smtm.1>, F<Finance::YahooQuote.3pm>,
-F<LWP.3pm>, F<Date::Manip.3pm>, F<Statistics::Descriptive.3pm>
+F<LWP.3pm>, F<Date::Manip.3pm>, F<Statistics::Descriptive.3pm>,
+F<setup_beancounter.1>, F<update_beancounter.1>,
 
 =head1 COPYRIGHT
 
-beancounter is (c) 2000, 2001, 2002 by Dirk Eddelbuettel <edd@debian.org>
+beancounter is (c) 2000 - 2004 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
 F<http://dirk.eddelbuettel.com/code/beancounter.html>.

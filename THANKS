@@ -44,6 +44,9 @@ Kevin Kim
 Matthew Jurgens
 	for a patch letting the non-US historical run batches of just 
         under 200 data points to accomodate a Yahoo! restriction
+Oliver Muth
+        for noticing that beancounter still used 'password' in the docs
+        for the optional 'passwd' argument for db connections
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 
