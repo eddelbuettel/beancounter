@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.81 2005/03/20 20:38:46 edd Exp $
+#  $Id: BeanCounter.pm,v 1.82 2005/04/14 02:46:54 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -72,7 +72,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.81 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.82 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -105,6 +105,11 @@ sub ConnectToDb {		# log us into the database (PostgreSQL)
 			  AutoCommit => 0 });
   } elsif (lc $Config{dbsystem} eq "sqlite") {
     $dbh = DBI->connect("dbi:SQLite:dbname=$Config{dbname}","","",
+			{ PrintError => $Config{debug}, 
+			  Warn => $Config{verbose}, 
+			  AutoCommit => 0 });
+  } elsif (lc $Config{dbsystem} eq "sqlite2") {
+    $dbh = DBI->connect("dbi:SQLite2:dbname=$Config{dbname}","","",
 			{ PrintError => $Config{debug}, 
 			  Warn => $Config{verbose}, 
 			  AutoCommit => 0 });

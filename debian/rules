@@ -1,14 +1,14 @@
 #! /usr/bin/make -f
 #                                                       -*- makefile -*-
 # debian/rules file for the Debian/GNU Linux beancounter package
-# Copyright (C) 2001 - 2004 by Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2001 - 2005 by Dirk Eddelbuettel <edd@debian.org>
 
 package	:= $(shell grep Package debian/control | sed 's/^Package: //')
 version	:= $(shell head -1 debian/changelog | \
 			perl -nle 'm/\S+\s+\((\S+)\)/ && print $$1')
 debtmp	:= $(shell pwd)/debian/$(package)
 
-srcdir  := /home/edd/src/progs/perl/beancounter
+srcdir  := /home/edd/chibud/src/progs/perl/beancounter
 webdir  := /home/edd/www/code/beancounter
 
 host	:= $(shell hostname)
@@ -51,9 +51,39 @@ update:
 	mv -v Finance-BeanCounter-$(version).tar.gz ..
 
 
-webdir:
+oldwebdir:
 ifneq ($(host),sonny)
 		@echo "This needs to run on sonny"
+		false
+endif
+	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
+		cd /tmp; \
+		fakeroot alien -r $(package)_$(version)_all.deb; \
+		fakeroot mv $(package)-$(version)-2.noarch.rpm \
+			$(package)-$(version).noarch.rpm; \
+		cd - ; \
+		mv /tmp/$(package)-$(version).noarch.rpm . )
+	cp -af  ../$(package)_$(version).tar.gz  \
+		../$(package)_$(version)_all.deb \
+		../$(package)-$(version).noarch.rpm \
+		TODO				 \
+	        debian/changelog		 \
+		beancounter.html		 \
+		BeanCounter.html		$(webdir)
+	(cd $(webdir); \
+		mv changelog ChangeLog;			\
+		ln -sfv	$(package)_$(version).tar.gz 	\
+			$(package)-current.tar.gz ;  	\
+		ln -sfv	$(package)_$(version)_all.deb 	\
+			$(package)-current.deb	;	\
+		ln -sfv	$(package)-$(version).noarch.rpm \
+			$(package)-current.rpm	;	\
+		ln -sfv ChangeLog ChangeLog.txt	;	\
+		ln -sfv TODO TODO.txt 			)
+
+webdir:
+ifneq ($(host),basebud)
+		@echo "This needs to run on basebud"
 		false
 endif
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \

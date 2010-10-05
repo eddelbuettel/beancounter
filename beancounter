@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.70 2005/03/21 01:34:52 edd Exp $
+#   $Id: beancounter,v 1.72 2005/04/14 04:36:58 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -34,12 +34,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.70 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.72 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.0";		# updated from the debian/rules Makefile
+my $version = "0.8.1";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2005/03/21 01:34:52 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2005/04/14 04:36:58 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -871,7 +871,8 @@ sub deletedb {			# this unfortunately is PostgreSQL specific
     system("dropdb $Config{dbname}")	# requires PostgreSQL >= 7.1
       or warn("Could not delete Postgresql database $Config{dbname}");
     ## bad return value, will trigger die() even on success
-  } elsif (lc $Config{dbsystem} eq "sqlite") {
+  } elsif (lc $Config{dbsystem} eq "sqlite" or 		# sqlite v3
+	   lc $Config{dbsystem} eq "sqlite2") {		# sqlite v2
     unlink($Config{dbname}) 
       or warn("Could not remove SQLite database $Config{dbname}");
   }
@@ -1255,8 +1256,11 @@ might prevent that, but would be more complex to implement.
 B<--rcfile> allows to specify a resource file different from the
 default I<~/.beancounterrc>. 
 
-B<--dbsystem> allows to switch to a different database backend. The 
-default is B<PostgreSQL> but B<MySQL> and B<SQLite> are also supported.
+B<--dbsystem> allows to switch to a different database backend. The
+default is B<PostgreSQL> but B<MySQL> and B<SQLite> are also
+supported. For B<SQLite>, the default is now version 3.* but the
+previous version -- which is not binarily compatible -- is supported
+as well with argument 'SQLite2'.
 
 B<--dbsystem> allows to switch to an alternate database. The default
 is 'beancounter'. This can be useful for testing new features.
@@ -1291,13 +1295,13 @@ options.
 =head2 DATABASE REQUIREMENTS
 
 B<beancounter> currently depends on either PostgreSQL, MySQL, SQLite
-or any other database for which an ODBC driver is available (though
-the required tables would have to created manually in the ODBC
-case). Yet another DB backend could be added provided suitable Perl
-DBI drivers are available. For PostgreSQL, MySQL and SQLite, the
-B<setup_beancounter> script can create and initialize the database,
-form the required tables and fills them with some example data. It is
-a starting point for local modifications.
+(version 2 or 3) or any other database for which an ODBC driver is
+available (though the required tables would have to created manually
+in the ODBC case). Yet another DB backend could be added provided
+suitable Perl DBI drivers are available. For PostgreSQL, MySQL and
+SQLite, the B<setup_beancounter> script can create and initialize the
+database, form the required tables and fills them with some example
+data. It is a starting point for local modifications.
 
 The connection to the database is made via a dedicated function in the
 B<BeanCounter.pm> module, changes would only have to be made there.
@@ -1326,7 +1330,8 @@ needed. If not specified, the current user id is used.
 if needed.
 
 =item I<dbsystem> to select a database backend, e.g. to switch from
-PostgreSQL to MySQL or SQLite.
+PostgreSQL to MySQL or SQLite or SQLite2 (the previous format of
+SQLite).
 
 =item I<dbsystem> to select a different default database name other
 than the default of 'beancounter'

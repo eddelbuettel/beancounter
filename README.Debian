@@ -16,8 +16,11 @@ On a Debian system, the following steps are required for beancounter to run:
    datestyle is my preference, others datestyles might or might not work.
 
    Postgresql is what I use on my development system. If you have experience
-   with MySQL, use that backend. SQLite may be the very easiest to setup
-   as it is file-based.
+   with MySQL, use that backend. 
+
+   SQLite may be the very easiest to setup as it is file-based. The preferred 
+   SQLite version is now SQLite3 but the previous version is still supported
+   in both setup_beancounter and beancounter itself.
 
 2. Install all the other Perl packages required by beancounter:
 
@@ -77,6 +80,10 @@ On a Debian system, the following steps are required for beancounter to run:
 
 6. As the user running beancounter, run 'setup_beancounter' to initialise
    the tables and run an example report.
+
+   setup_beancounter can create and populate databases for PostgreSQL, MySQL
+   SQLite (the current version 3.*) and SQLite2 (the previous version, with
+   an incompatible format).
 
 7. That's it! 
 

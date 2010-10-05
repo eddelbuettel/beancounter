@@ -1,3 +1,34 @@
+beancounter (0.8.1) unstable; urgency=low
+
+  * Minor update release which adds support for SQLite3
+  
+    o [setup_beancounter] Updated to use sqlite3 as the new default,
+      but added new option '-o $file' to create databases for the 
+      previous release of SQLite (which uses an incompatible format
+      relative to SQLite v3.*). 
+  
+    o [beancounter, BeanCounter.pm] Accordingly, updated such that 
+      SQLite is still the default (but expects a version 3.* database)
+      yet allows for version 2.* databases with the newly added 
+      option --dbsystem=SQLite2
+  
+    o On the Perl side of things, we now require DBD::SQLite releases
+      1.0.* or later (which match SQLite v3.*) as the default. Access
+      to older SQLite databases is possible via DBD::SQLite2, the 
+      compatibility package.  
+  
+    o This setup allows users to continue to use existing (v2) SQLite
+      databases, as well as to continue to create them under this older
+      version should they so desire --- but offers the newer and more 
+      featureful version 3.* of SQLite as the new default. 
+  
+    o Beancounter users employing either PostgreSQL or MySQL are not 
+      affected by this in any form.  
+  
+    o [debian/control] Depends updated accordingly  
+   
+ -- Dirk Eddelbuettel <edd@debian.org>  Thu, 14 Apr 2005 22:37:41 -0500
+
 beancounter (0.8.0) unstable; urgency=low
 
   * New release with the following new features:

@@ -3,7 +3,7 @@
 #
 # BeanCounter.pm --- A stock portfolio performance monitoring tool
 #
-# Copyright (C) 2000 - 2004 Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2000 - 2005 Dirk Eddelbuettel <edd@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
 	      'NAME'		=> 'Finance::BeanCounter',
-	      'VERSION'		=> '0.8.0',
+	      'VERSION'		=> '0.8.1',
 	      'PREREQ_PM'   	=> { "LWP::UserAgent"   => 1.62,
 				     "HTTP::Request"    => 1.23,
 				     "HTML::Parser"     => 2.20,
@@ -37,7 +37,8 @@ WriteMakefile(
 				     ##   "DBD::Pg"	=> 0.93,
 				     ##   "DBD::ODBC"	=> 0.28,
 				     ##   "DBD::mysql"	=> 2.0416,
-				     ##   "DBD::SQLite",
+				     ##   "DBD::SQLite" => 1.0,    # v3
+				     ##   "DBD::SQLite2"=> 0.33
 				     "Statistics::Descriptive" => 2.4,
 				     "Finance::YahooQuote" => 0.20
 				   },
