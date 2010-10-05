@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.58 2004/01/22 01:06:04 edd Exp $
+#  $Id: BeanCounter.pm,v 1.59 2004/01/24 23:47:42 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.58 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.59 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -94,6 +94,11 @@ sub ConnectToDb {		# log us into the database (PostgreSQL)
   } elsif (lc $Config{dbsystem} eq "mysql") {
     $dbh = DBI->connect("dbi:mysql:dbname=$Config{dbname};host=$Config{host}",
 			$Config{user}, $Config{passwd},
+			{ PrintError => $Config{debug}, 
+			  Warn => $Config{verbose}, 
+			  AutoCommit => 0 });
+  } elsif (lc $Config{dbsystem} eq "sqlite") {
+    $dbh = DBI->connect("dbi:SQLite:dbname=$Config{dbname}","","",
 			{ PrintError => $Config{debug}, 
 			  Warn => $Config{verbose}, 
 			  AutoCommit => 0 });
@@ -535,7 +540,7 @@ sub GetRetracementData {
   $stmt .= qq{and p.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
-  $stmt .= "order by symbol";
+  $stmt .= "order by p.symbol";
 
   print "GetRetracementData():\n\$stmt = $stmt\n" if $Config{debug};
 
@@ -623,7 +628,7 @@ sub GetRiskData {
   $stmt .= qq{and p.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
-  $stmt .= "order by symbol";
+  $stmt .= "order by p.symbol";
 
   print "GetRiskData():\n\$stmt = $stmt\n" if $Config{debug};
 
@@ -902,7 +907,7 @@ sub DatabaseHistoricalData {
       # based on the number of elements, ie columns, we split the parsing
       if ($checked eq 5 or $checked eq 6) {   # volume, and maybe adj. close
 	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
+	$date = UnixDate(ParseDate($date), "%Y%m%d");
 	%data = (symbol    => $symbol,
 		 date	   => $date,
 		 day_open  => $open,
@@ -912,13 +917,13 @@ sub DatabaseHistoricalData {
 		 volume    => $volume);
       } elsif ($checked eq 1) {	# only close for mutual funds
 	($date, $close) = split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
+	$date = UnixDate(ParseDate($date), "%Y%m%d");
 	%data = (symbol    => $symbol,
 		 date	   => $date,
 		 day_close => $close);
       } else {			# no volume for indices
 	($date, $open, $high, $low, $close) = split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
+	$date = UnixDate(ParseDate($date), "%Y%m%d");
 	%data = (symbol    => $symbol,
 		 date	   => $date,
 		 day_open  => $open,
@@ -980,7 +985,7 @@ sub DatabaseHistoricalFXData {
       # based on the number of elements, ie columns, we split the parsing
       if ($checked eq 5 or $checked eq 6) {
 	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
+	$date = UnixDate(ParseDate($date), "%Y%m%d");
 	%data = (symbol    => $fx,
 		 date	   => $date,
 		 day_open  => $open,
@@ -1386,11 +1391,11 @@ __END__
 
 =head1 NAME
 
-Finance::Beancounter - Module for stock portfolio performance functions.
+Finance::BeanCounter - Module for stock portfolio performance functions.
 
 =head1 SYNOPSIS
 
- use Finance::Beancounter;
+ use Finance::BeanCounter;
 
 =head1 DESCRIPTION
 

@@ -21,6 +21,8 @@ update:
 	cp -af	$(srcdir)/BeanCounter.pm 			\
 		$(srcdir)/beancounter 				\
 		$(srcdir)/README 				\
+		$(srcdir)/README.Debian				\
+		$(srcdir)/README.non-gnu			\
 		$(srcdir)/TODO	 				\
 		$(srcdir)/THANKS 				\
 		$(srcdir)/Makefile.PL 				\
@@ -28,11 +30,13 @@ update:
 		$(srcdir)/beancounter_example.txt 		\
 		$(srcdir)/beancounter_schema_postgresql.txt 	\
 		$(srcdir)/beancounter_schema_mysql.txt 		\
+		$(srcdir)/beancounter_schema_sqlite.txt 	\
 		$(srcdir)/setup_beancounter			\
 		$(srcdir)/update_beancounter			.
 
 webdir:
 ifneq ($(host),sonny)
+		@echo "This needs to run on sonny"
 		false
 endif
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
@@ -96,10 +100,11 @@ binary-indep: build
         #$(MAKE) 		prefix=$(debtmp)/usr pure_install
 	$(MAKE) 		install PREFIX=$(debtmp)/usr
 	dh_perl	
-	dh_installdocs		THANKS TODO README README.Debian
+	dh_installdocs		THANKS TODO README README.Debian README.non-gnu
 	dh_installexamples	example.beancounterrc flip_symbol.sh 	\
 				beancounter_example.txt 		\
 				beancounter_schema_postgresql.txt 	\
+				beancounter_schema_sqlite.txt	 	\
 				beancounter_schema_mysql.txt 		
         #dh_installmenu
         #dh_installinit

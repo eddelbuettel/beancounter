@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.48 2004/01/22 01:07:19 edd Exp $
+#   $Id: beancounter,v 1.49 2004/01/24 23:45:07 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -32,12 +32,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.48 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.49 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.6.1";		# updated from the debian/rules Makefile
+my $version = "0.7.0";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2004/01/22 01:07:19 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2004/01/24 23:45:07 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -88,6 +88,8 @@ if (TestInsufficientDatabaseSchema($dbh, $db_min_schema)) {
     day_end_report($sqlrestriction);
     portfolio_status($sqlrestriction);
     portfolio_risk($sqlrestriction);
+    portfolio_retracement($sqlrestriction, "advance");
+    portfolio_retracement($sqlrestriction, "retrace");
   } elsif ($command =~ /^dayendreport$/) {
     day_end_report($sqlrestriction);
   } elsif ($command =~ /^dailyjob$/) {
@@ -401,7 +403,8 @@ sub day_end_report {
     = GetPriceData($dbh,$date,$res);
   $fx->{'home currency'} = $Config{currency};
 
-  my ($fx_prices, $prev_fx_prices) = GetFXData($dbh, $date, $fx);
+  my ($fx_prices) = GetFXData($dbh, $date, $fx);
+  my ($prev_fx_prices) = GetFXData($dbh, $prev_date, $fx);
   display_report($pretty_date, $pretty_prev_date, $prices, $prev_prices,
 		 $fx_prices, $prev_fx_prices, $shares, $fx, $pricedate);
 
@@ -688,12 +691,17 @@ sub delete_stock {
 sub deletedb {			# this unfortunately is PostgreSQL specific
   CloseDB($dbh);		# or we won't be able to close
   if (lc $Config{dbsystem} eq "mysql") {
-    system("mysqladmin drop $Config{dbname}");
+    system("mysqladmin drop $Config{dbname}")
+      or warn("Could not delete MySQL database $Config{dbname}");
     ## bad return value, will trigger die() even on success
-  } else {
+  } elsif (lc $Config{dbsystem} eq "postgresql") {
     #  system("psql -q -c \"drop database beancounter\"") == 0 
-    system("dropdb $Config{dbname}");	# requires PostgreSQL >= 7.1
+    system("dropdb $Config{dbname}")	# requires PostgreSQL >= 7.1
+      or warn("Could not delete Postgresql database $Config{dbname}");
     ## bad return value, will trigger die() even on success
+  } elsif (lc $Config{dbsystem} eq "sqlite") {
+    unlink($Config{dbname}) 
+      or warn("Could not remove SQLite database $Config{dbname}");
   }
   exit(0);
 }
@@ -760,10 +768,10 @@ main mode is data gathering: both current data (e.g. end-of-day
 closing prices) and historical price data (to back-populate the
 database) can be retrieved both automatically and efficiently with
 subsequent local storage in a relational database system (either
-F<PostgreSQL> or F<MySQL> though any other system with an F<ODBC>
-driver could be used). The second main mode is data analysis where the
-stored data is evaluated to provide performance information. Several
-canned reports types are already available.
+F<PostgreSQL>, F<MySQL> or F<SQLite>) though any other system with an
+F<ODBC> driver could be used). The second main mode is data analysis
+where the stored data is evaluated to provide performance
+information. Several canned reports types are already available.
 
 Data is retrieved very efficiently in a single batch query per Yahoo!
 host from the Yahoo! Finance web sites using Finance::YahooQuote
@@ -1057,7 +1065,7 @@ B<--rcfile> allows to specify a resource file different from the
 default I<~/.beancounterrc>. 
 
 B<--dbsystem> allows to switch to a different database backend. The 
-default is B<PostgreSQL> but B<MySQL> is also supported.
+default is B<PostgreSQL> but B<MySQL> and B<SQLite> are also supported.
 
 B<--dbsystem> allows to switch to an alternate database. The default
 is 'beancounter'. This can be useful for testing new features.
@@ -1076,20 +1084,20 @@ options.
 
 =head2 DATABASE REQUIREMENTS
 
-B<beancounter> currently depends on either PostgreSQL or MySQL, or any
-other database for which an ODBC driver is available (though the
-required tables would have to created manually in the ODBC case). Yet
-another DB backend could be added provided suitable Perl DBI drivers
-are available. For PostgreSQL and MySQL, the B<setup_beancounter>
-script can create and initialize the database, form the required
-tables and fills them with some example data. It is a starting point
-for local modifications.
+B<beancounter> currently depends on either PostgreSQL, MySQL, SQLite
+or any other database for which an ODBC driver is available (though
+the required tables would have to created manually in the ODBC
+case). Yet another DB backend could be added provided suitable Perl
+DBI drivers are available. For PostgreSQL, MySQL and SQLite, the
+B<setup_beancounter> script can create and initialize the database,
+form the required tables and fills them with some example data. It is
+a starting point for local modifications.
 
 The connection to the database is made via a dedicated function in the
 B<BeanCounter.pm> module, changes would only have to be made there.
 As of this writing the B<Perl DBI> (the database-independent interface
-for Perl) is used along the DBI drivers for PostgreSQL, MySQL and
-ODBC. Ports for MySQL, Oracle, ... are encouraged.
+for Perl) is used along the DBI drivers for PostgreSQL, MySQL, SQLite
+and ODBC. Ports for Oracle, Sybase, ... are encouraged.
 
 =head2 CONFIG FILE
 
@@ -1112,7 +1120,7 @@ needed. If not specified, the current user id is used.
 if needed.
 
 =item I<dbsystem> to select a database backend, e.g. to switch from
-PostgreSQL to MySQL
+PostgreSQL to MySQL or SQLite.
 
 =item I<dbsystem> to select a different default database name other
 than the default of 'beancounter'
@@ -1182,7 +1190,7 @@ actual data sources as follows:
    ShowOidColumn   = No
    FakeOidIndex    = No
    ConnSettings    =
-   
+
    [beancounter]
    Description     = Beancounter DB (Postgresql)
    Driver          = Postgresql

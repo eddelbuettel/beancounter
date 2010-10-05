@@ -28,9 +28,11 @@ Thomas Walter
 	as well as for a fine patch correcting a logic error in the SQL code
 	in GetPriceData which affected the status report if securities had
 	multiple positions across portfolios
-Robert a. Schmied
+Robert A. Schmied
         for a thoughtful set of patches to beancounter, BeanCounter.pm
 	setup_beancounter and update_beancounter. First Grand Slam winner :)
+Mike Castle
+        for a patch with more consistent upper/lower case of BeanCounter
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 

@@ -6,7 +6,7 @@ On a Debian system, the following steps are required for beancounter to run:
 0. In case you are upgrading from an older installation of beancounter,
    run the script update_beancounter to add some columns to the tables.
 
-1. Install PostgreSQL (if it is not yet installed)
+1. Install PostgreSQL [or MySQL or SQLite]
 
       root# apt-get install postgresql
 
@@ -15,11 +15,16 @@ On a Debian system, the following steps are required for beancounter to run:
    Configure postgresql with the defaults (ie SQL_ASCII) encoding and ISO
    datestyle is my preference, others datestyles might or might not work.
 
+   Postgresql is what I use on my development system. If you have experience
+   with MySQL, use that backend. SQLite may be the very easiest to setup
+   as it is file-based.
+
 2. Install all the other Perl packages required by beancounter:
 
       root# apt-get install libdbd-pg-perl libdbi-perl
 
-   and the other packages.
+   and the other packages. But 'apt-get install beancounter' should have
+   taken care of that anyway.
 
 3. Configure postgres to let the user as which you are running beancounter
    create database etc:
@@ -35,12 +40,30 @@ On a Debian system, the following steps are required for beancounter to run:
    *important* to use the -d option to createuser. 
 
 4. Configure postgres to allow TCP/IP connections by uncommenting the 
-   following line in /etc/postgresql/postmaster.init:
+   following line in /etc/postgresql/postgresql.conf
 
+       # TCP/IP access is allowed by default, but the default access given in
+       # pg_hba.conf will permit it only from localhost, not other machines.
+      tcpip_socket = true
+
+   [ Historically, this option was in the file postmaster.init:
        # PGALLOWTCPIP=no  
        PGALLOWTCPIP=yes 
+     but this seems to have changed with the 7.* releases of Postgresql. ]
 
-   and restarting the postgresql daemon:
+   Also ensure that network access is granted via /etc/posgresql/pg_hba_conf:
+
+     # TYPE  DATABASE    USER  IP-ADDRESS     IP-MASK          METHOD
+
+     local   all         all                                   trust
+     host    all         all   127.0.0.1      255.0.0.0        trust
+     host    all         all   192.168.1.0    255.255.255.0    ident sameuser
+
+   which enables me to have access from the same machine (127.0.0.1) for
+   whoever is on it, as well as from users owning databases from whereever
+   they are on my local LAN.
+
+   Lastly, restarting the postgresql daemon:
 
        root# /etc/init.d/postgresql restart    
 
@@ -57,12 +80,3 @@ On a Debian system, the following steps are required for beancounter to run:
 
 7. That's it! 
 
-As of February 2001, I have yet to test it on a current Debian 'unstable'
-release (with release-number-to-be 2.3 and codename 'woody'). There might be
-issues with Postgresql 7.* that I am not yet aware of. If the reader of these
-lines finds any, I would appreciate an email, preferably with some examples.
-
-Update: There were some subtle changes from Postgresql 6.5.* to 7.* but it
-works jus fine. 
-
-Update^2: We now also work with MySQL.

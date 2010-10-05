@@ -101,10 +101,10 @@ main mode is data gathering: both current data (e.g. end-of-day
 closing prices) and historical price data (to back-populate the
 database) can be retrieved both automatically and efficiently with
 subsequent local storage in a relational database system (either
-<em>PostgreSQL</em> or <em>MySQL</em> though any other system with an <em>ODBC</em>
-driver could be used). The second main mode is data analysis where the
-stored data is evaluated to provide performance information. Several
-canned reports types are already available.</p>
+<em>PostgreSQL</em>, <em>MySQL</em> or <em>SQLite</em>) though any other system with an
+<em>ODBC</em> driver could be used). The second main mode is data analysis
+where the stored data is evaluated to provide performance
+information. Several canned reports types are already available.</p>
 <p>Data is retrieved very efficiently in a single batch query per Yahoo!
 host from the Yahoo! Finance web sites using Finance::YahooQuote
 module (where version 0.18 or newer is required for proxy
@@ -369,7 +369,7 @@ might prevent that, but would be more complex to implement.</p>
 <p><strong>--rcfile</strong> allows to specify a resource file different from the
 default <em>~/.beancounterrc</em>.</p>
 <p><strong>--dbsystem</strong> allows to switch to a different database backend. The 
-default is <strong>PostgreSQL</strong> but <strong>MySQL</strong> is also supported.</p>
+default is <strong>PostgreSQL</strong> but <strong>MySQL</strong> and <strong>SQLite</strong> are also supported.</p>
 <p><strong>--dbsystem</strong> allows to switch to an alternate database. The default
 is 'beancounter'. This can be useful for testing new features.</p>
 <p><strong>--fxupdate</strong> is a boolean switch to enforece updates of FX rates during
@@ -386,19 +386,19 @@ options.</p>
 <p>
 </p>
 <h2><a name="database_requirements">DATABASE REQUIREMENTS</a></h2>
-<p><strong>beancounter</strong> currently depends on either PostgreSQL or MySQL, or any
-other database for which an ODBC driver is available (though the
-required tables would have to created manually in the ODBC case). Yet
-another DB backend could be added provided suitable Perl DBI drivers
-are available. For PostgreSQL and MySQL, the <strong>setup_beancounter</strong>
-script can create and initialize the database, form the required
-tables and fills them with some example data. It is a starting point
-for local modifications.</p>
+<p><strong>beancounter</strong> currently depends on either PostgreSQL, MySQL, SQLite
+or any other database for which an ODBC driver is available (though
+the required tables would have to created manually in the ODBC
+case). Yet another DB backend could be added provided suitable Perl
+DBI drivers are available. For PostgreSQL, MySQL and SQLite, the
+<strong>setup_beancounter</strong> script can create and initialize the database,
+form the required tables and fills them with some example data. It is
+a starting point for local modifications.</p>
 <p>The connection to the database is made via a dedicated function in the
 <strong>BeanCounter.pm</strong> module, changes would only have to be made there.
 As of this writing the <strong>Perl DBI</strong> (the database-independent interface
-for Perl) is used along the DBI drivers for PostgreSQL, MySQL and
-ODBC. Ports for MySQL, Oracle, ... are encouraged.</p>
+for Perl) is used along the DBI drivers for PostgreSQL, MySQL, SQLite
+and ODBC. Ports for Oracle, Sybase, ... are encouraged.</p>
 <p>
 </p>
 <h2><a name="config_file">CONFIG FILE</a></h2>
@@ -419,7 +419,7 @@ needed. If not specified, the current user id is used.</a></strong><br />
 if needed.</a></strong><br />
 </dt>
 <dt><strong><a name="item_dbsystem_to_select_a_database_backend_2c_e_2eg_2e_"><em>dbsystem</em> to select a database backend, e.g. to switch from
-PostgreSQL to MySQL</a></strong><br />
+PostgreSQL to MySQL or SQLite.</a></strong><br />
 </dt>
 <dt><strong><a name="item_dbsystem_to_select_a_different_default_database_na"><em>dbsystem</em> to select a different default database name other
 than the default of 'beancounter'</a></strong><br />
@@ -487,8 +487,8 @@ actual data sources as follows:</p>
    ShowSystemTables= No
    ShowOidColumn   = No
    FakeOidIndex    = No
-   ConnSettings    =
-   
+   ConnSettings    =</pre>
+<pre>
    [beancounter]
    Description     = Beancounter DB (Postgresql)
    Driver          = Postgresql

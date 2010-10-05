@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.27 2004/01/22 01:02:42 edd Exp $
+#   $Id: setup_beancounter,v 1.28 2004/01/24 23:48:33 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -42,7 +42,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.5.0'
+VERSION='0.7.0'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'
@@ -75,6 +75,7 @@ Usage: $progname [-m] [-n databasename] [-h]
 Options:
     -m		Use MySQL instead of PostgreSQL
     -n SOMENAME Create database as SOMENAME instead of beancounter
+    -l dbfile   Use SQLite as the backend with database file 'dbfile'
     -s		Schema only -- Do not fill the database
     -h		Show this help
 EOF
@@ -259,14 +260,101 @@ function create_postgres_tables
 EOF
 }
 
+function create_sqlite_tables 
+{
+    echo | $DBCOMMAND $DATABASE <<EOF 
+
+	create table beancounter (
+	    version		varchar(12) not null,
+   	    data_last_updated	timestamp with time zone
+	);
+	insert into beancounter values('$VERSION', 'now');
+
+	create table stockinfo (
+	    symbol   		varchar(12) not null default '',
+	    name     		varchar(64) not null default '',
+	    exchange 		varchar(16) not null default '',
+	    capitalisation  	float4 default null,
+	    low_52weeks		float4 default null,
+	    high_52weeks	float4 default null,
+	    earnings		float4 default null,
+	    dividend		float4 default null,
+	    p_e_ratio		float4 default null,
+	    avg_volume		int4 default null,
+	    active		boolean default TRUE
+	);
+	create unique index stockinfo_pkey
+	    on stockinfo (symbol);
+
+	create table stockprices (
+	    symbol   		varchar(12) not null default '',
+	    date		date default null,
+	    previous_close	float4 default null,
+	    day_open		float4 default null,
+	    day_low		float4 default null,
+	    day_high		float4 default null,
+	    day_close		float4 default null,
+	    day_change		float4 default null,
+	    bid			float4 default null,
+	    ask			float4 default null,
+	    volume		int4 default null
+	);
+	create unique index stockprices_pkey
+	    on stockprices (symbol, date);
+
+	create table fxprices (
+	    currency   		varchar(12) not null default '',
+	    date		date default null,
+	    previous_close	float4 default null,
+	    day_open		float4 default null,
+	    day_low		float4 default null,
+	    day_high		float4 default null,
+	    day_close		float4 default null,
+	    day_change		float4 default null
+	);
+	create unique index fxprices_pkey
+	    on fxprices (currency, date);
+
+	create table portfolio (
+	    symbol   		varchar(16) not null default '',
+	    shares		float4 default null,
+	    currency		varchar(12) default null,
+	    type		varchar(16) default null,
+	    owner		varchar(16) default null,
+	    cost		float(4) default null,
+	    date		date default null
+	);
+	create unique index portfolio_pkey
+	    on portfolio (symbol, owner, date);
+
+	create table cash (
+	    name 		varchar(16) not null default '',
+	    value 		float default null,
+	    currency 		varchar(12) default null,
+	    type 		varchar(12) default null,
+	    owner 		varchar(16) default NULL,
+	    cost 		float default NULL,
+	    date 		date default NULL
+	);
+	create unique index cash_pkey 
+	    on cash (name,type,owner,date);
+
+	create table indices (
+	    symbol   		varchar(12) not null default '',
+	    stockindex		varchar(12) not null default ''
+	);
+EOF
+}
+
 function exit_if_exists
 {
     set +e
-    if [ "$DBSYSTEM" = "MySQL" ]
-    then
+    if [ "$DBSYSTEM" = "MySQL" ]; then
 	result=`echo 'show databases'| $DBCOMMAND | grep $DATABASE`
-    else
+    elif [ "$DBSYSTEM" = "PostgreSQL" ]; then
 	result=`$DBCOMMAND template1 -l | grep $DATABASE`
+    elif [ "$DBSYSTEM" = "SQLite" ]; then
+	result=`test -f $DATABASE && ls -1 $DATABASE`
     fi
     set -e
     if [ "$result" != "" ]
@@ -282,6 +370,7 @@ function exit_if_exists
 	echo "If you want to delete the exiting database, use"
 	echo "    dropdb $DATABASE       	for PostgreSQL"
 	echo "    mysqladmin -f drop $DATABASE	for MySQL"
+	echo "    rm $DATABASE	                for SQLite"
 	echo ""
 	exit 1
     fi
@@ -364,7 +453,7 @@ function exit_if_no_mysql_user
 
 # ------------------------ 'main' code -------------------------------------
 
-while getopts ":mn:sh" opt
+while getopts ":mn:l:sh" opt
 do
     case $opt in
 	m)
@@ -374,6 +463,11 @@ do
 	n)
 	    DATABASE=$OPTARG
 	    echo "Now using database name $DATABASE"
+	    ;;
+	l)
+	    DBSYSTEM='SQLite'
+	    DATABASE=$OPTARG
+	    echo "Now using $DBSYSTEM on $DATABASE"
 	    ;;
 	s)
 	    SCHEMA_ONLY=1
@@ -389,19 +483,29 @@ done
 
 BEANCOUNTER="beancounter --dbsystem $DBSYSTEM --dbname $DATABASE"
 
-if [ "$DBSYSTEM" = "MySQL" ]; then
+DBCOMMAND=""
+if [ "$DBSYSTEM" = "PostgreSQL" ]; then		# if Postgres 
+    if [ -z "$PASSWORD" ]; then
+	DBCOMMAND="psql -q"
+    else
+	DBCOMMAND="psql -q -W $PASSWORD"
+    fi
+elif [ "$DBSYSTEM" = "MySQL" ]; then 		# if MySQL
     # mysql(1) arguments -- you could add host, port, ... here
     if [ -z "$PASSWORD" ]; then
 	DBCOMMAND="mysql"
     else
 	DBCOMMAND="mysql -p$PASSWORD"
     fi
+elif [ "$DBSYSTEM" = "SQLite" ]; then 		# if SQLite 
+    DBCOMMAND="sqlite"
 else
-    if [ -z "$PASSWORD" ]; then
-	DBCOMMAND="psql -q"
-    else
-	DBCOMMAND="psql -q -W $PASSWORD"
-    fi
+    echo ""
+    echo "*** Error: Unsupported database system ***"
+    echo ""
+    echo "The backend $DBSYSTEM is not supported. Patches welcome..."
+    echo ""
+    exit 1
 fi
 
 # test if we are running this as root
@@ -410,30 +514,34 @@ exit_if_root $USER
 # test if database can be accessed by user
 if [ "$DBSYSTEM" = "PostgreSQL" ]; then
     exit_if_no_postgres_user $USER
-else
+elif [ "$DBSYSTEM" = "MySQL" ]; then
     exit_if_no_mysql_user $USER
 fi
 
 # test if $DATABASE exists and exit if true
 exit_if_exists
-
+			
 echo "Creating $DATABASE database"
 if [ "$DBSYSTEM" = "PostgreSQL" ]; then
     execute "createdb $DATABASE"
-else
+elif [ "$DBSYSTEM" = "MySQL" ]; then
     echo "create database $DATABASE;" | $DBCOMMAND 
 # NB deleting db under MySQL is:  mysqladmin drop beancounter_test -p$PASSWORD
 # grant access to $DATABASE db
 #GRANT="grant select,delete,insert,update on $DATABASE.* to $USER@localhost"
 #echo $GRANT | $DBCOMMAND
+elif [ "$DBSYSTEM" = "SQLite" ]; then
+    true # do nothing
 fi
 echo ""
 
 echo "Creating $DATABASE database tables"
 if [ "$DBSYSTEM" = "PostgreSQL" ]; then
     create_postgres_tables 
-else
+elif [ "$DBSYSTEM" = "MySQL" ]; then
     create_mysql_tables 
+elif [ "$DBSYSTEM" = "SQLite" ]; then
+    create_sqlite_tables
 fi
 
 if [ "$SCHEMA_ONLY" -eq 1 ]; then
@@ -490,10 +598,11 @@ of the features of B<beancounter>.
 
 =head1 OPTIONS
 
- -m       Use MySQL as the backend over the default PostgreSQL
- -n name  Use name as the database instead of beancounter
- -s       Do not fill the database, only create its schema
- -h       Show a simple help message
+ -m        Use MySQL as the backend over the default PostgreSQL
+ -l dbfile Use SQLite as the backend with database file 'dbfile'
+ -n name   Use name as the database instead of beancounter
+ -s        Do not fill the database, only create its schema
+ -h        Show a simple help message
 
 =head1 SEE ALSO
 
