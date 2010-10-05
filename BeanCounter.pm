@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.49 2003/04/26 21:54:01 edd Exp edd $
+#  $Id: BeanCounter.pm,v 1.50 2003/11/29 03:20:35 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.49 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.50 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -245,7 +245,8 @@ sub GetCashData {
   my ($name, $value, $fx, $cost);
   # get the symbols
   $stmt  = "select name, value, currency, cost from cash ";
-  $stmt .= "where $res " if (defined($res));
+  $stmt .= "where value > 0 ";
+  $stmt .= "and $res " if (defined($res));
   $stmt .= "order by name";
   $sth = $dbh->prepare($stmt);
   $rv = $sth->execute(); 	# run query for report end date
@@ -852,7 +853,7 @@ sub DatabaseHistoricalFXData {
     } elsif ($checked) {
       my ($date, $open, $high, $low, $close, $volume, $cmd);
       # based on the number of elements, ie columns, we split the parsing
-      if ($checked eq 5) {	# fx (and indices) have no volume
+      if ($checked eq 5 or $checked eq 6) {
 	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
 	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
 	%data = (symbol    => $fx,

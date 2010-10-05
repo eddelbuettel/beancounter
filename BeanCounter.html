@@ -1,83 +1,89 @@
-<HTML>
-<HEAD>
-<TITLE>Finance::Beancounter - Module for stock portfolio performance functions.</TITLE>
-<LINK REV="made" HREF="mailto:perl@packages.debian.org">
-</HEAD>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Finance::Beancounter - Module for stock portfolio performance functions.</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
 
-<BODY>
+<body style="background-color: white">
 
-<A NAME="__index__"></A>
+<p><a name="__index__"></a></p>
 <!-- INDEX BEGIN -->
 
-<UL>
+<ul>
 
-	<LI><A HREF="#name">NAME</A></LI>
-	<LI><A HREF="#synopsis">SYNOPSIS</A></LI>
-	<LI><A HREF="#description">DESCRIPTION</A></LI>
-	<LI><A HREF="#database layout">DATABASE LAYOUT</A></LI>
-	<UL>
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#database_layout">DATABASE LAYOUT</a></li>
+	<ul>
 
-		<LI><A HREF="#the stockinfo table">THE STOCKINFO TABLE</A></LI>
-		<LI><A HREF="#the stockprices table">THE STOCKPRICES TABLE</A></LI>
-		<LI><A HREF="#the fxprices table">THE FXPRICES TABLE</A></LI>
-		<LI><A HREF="#the stockportfolio table">THE STOCKPORTFOLIO TABLE</A></LI>
-		<LI><A HREF="#the indices table">THE INDICES TABLE</A></LI>
-	</UL>
+		<li><a href="#the_stockinfo_table">THE STOCKINFO TABLE</a></li>
+		<li><a href="#the_stockprices_table">THE STOCKPRICES TABLE</a></li>
+		<li><a href="#the_fxprices_table">THE FXPRICES TABLE</a></li>
+		<li><a href="#the_stockportfolio_table">THE STOCKPORTFOLIO TABLE</a></li>
+		<li><a href="#the_indices_table">THE INDICES TABLE</a></li>
+	</ul>
 
-	<LI><A HREF="#bugs">BUGS</A></LI>
-	<LI><A HREF="#see also">SEE ALSO</A></LI>
-	<LI><A HREF="#copyright">COPYRIGHT</A></LI>
-	<LI><A HREF="#acknowledgements">ACKNOWLEDGEMENTS</A></LI>
-</UL>
+	<li><a href="#bugs">BUGS</a></li>
+	<li><a href="#see_also">SEE ALSO</a></li>
+	<li><a href="#copyright">COPYRIGHT</a></li>
+	<li><a href="#acknowledgements">ACKNOWLEDGEMENTS</a></li>
+</ul>
 <!-- INDEX END -->
 
-<HR>
-<P>
-<H1><A NAME="name">NAME</A></H1>
-<P>Finance::Beancounter - Module for stock portfolio performance functions.</P>
-<P>
-<HR>
-<H1><A NAME="synopsis">SYNOPSIS</A></H1>
-<PRE>
- use Finance::Beancounter;</PRE>
-<P>
-<HR>
-<H1><A NAME="description">DESCRIPTION</A></H1>
-<P><STRONG>Finance::BeanCounter</STRONG> provides functions to <EM>download</EM>, <EM>store</EM> and
-<EM>analyse</EM> stock market data.</P>
-<P><EM>Downloads</EM> are available of current (or rather: 15 or 20
+<hr />
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>Finance::Beancounter - Module for stock portfolio performance functions.</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<pre>
+ use Finance::Beancounter;</pre>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p><strong>Finance::BeanCounter</strong> provides functions to <em>download</em>, <em>store</em> and
+<em>analyse</em> stock market data.</p>
+<p><em>Downloads</em> are available of current (or rather: 15 or 20
 minute-delayed) price and company data as well as of historical price
 data.  Both forms can be stored in an SQL database (for which we
-currently default to <STRONG>PostgreSQL</STRONG> though <STRONG>MySQL</STRONG> is supported as
-well; furthermore any database reachable by means of an <STRONG>ODBC</STRONG>
-connection should work).</P>
-<P><EM>Analysis</EM> currently consists of performance and risk
+currently default to <strong>PostgreSQL</strong> though <strong>MySQL</strong> is supported as
+well; furthermore any database reachable by means of an <strong>ODBC</strong>
+connection should work).</p>
+<p><em>Analysis</em> currently consists of performance and risk
 analysis. Performance reports comprise a profit-and-loss (or 'p/l' in
 the lingo) report which can be run over arbitrary time intervals such
-as <CODE>--prevdate 'friday six months ago' --date 'yesterday'</CODE> -- in
-essence, whatever the wonderful <STRONG>Date::Manip</STRONG> module understands --
+as <code>--prevdate 'friday six months ago' --date 'yesterday'</code> -- in
+essence, whatever the wonderful <strong>Date::Manip</strong> module understands --
 as well as dayendreport which defaults to changes in the last trading
 day. A risk report show parametric and non-parametric value-at-risk
-(VaR) estimates.</P>
-<P>Most available functionality is also provided in the reference
-implementation <STRONG>beancounter</STRONG>, a convenient command-line script.</P>
-<P>The API might change and evolve over time. The low version number
+(VaR) estimates.</p>
+<p>Most available functionality is also provided in the reference
+implementation <strong>beancounter</strong>, a convenient command-line script.</p>
+<p>The API might change and evolve over time. The low version number
 really means to say that the code is not in its final form yet, but it
-has been in use for well over two years.</P>
-<P>More documentation is in the Perl source code.</P>
-<P>
-<HR>
-<H1><A NAME="database layout">DATABASE LAYOUT</A></H1>
-<P>The easiest way to see the table design is to look at the content of
-the <STRONG>setup_beancounter</STRONG> script. It creates the five tables
-<EM>stockinfo</EM>, <EM>stockprices</EM>, <EM>fxprices</EM>, <EM>portfolio</EM> and
-<EM>indices</EM>. Note also that is supports the creation of database for
-both <STRONG>PostgreSQL</STRONG> and <STRONG>MySQL</STRONG>.</P>
-<P>
-<H2><A NAME="the stockinfo table">THE STOCKINFO TABLE</A></H2>
-<P>The <EM>stockinfo</EM> table contains general (non-price) information and is
-index by <EM>symbol</EM>:</P>
-<PRE>
+has been in use for well over two years.</p>
+<p>More documentation is in the Perl source code.</p>
+<p>
+</p>
+<hr />
+<h1><a name="database_layout">DATABASE LAYOUT</a></h1>
+<p>The easiest way to see the table design is to look at the content of
+the <strong>setup_beancounter</strong> script. It creates the five tables
+<em>stockinfo</em>, <em>stockprices</em>, <em>fxprices</em>, <em>portfolio</em> and
+<em>indices</em>. Note also that is supports the creation of database for
+both <strong>PostgreSQL</strong> and <strong>MySQL</strong>.</p>
+<p>
+</p>
+<h2><a name="the_stockinfo_table">THE STOCKINFO TABLE</a></h2>
+<p>The <em>stockinfo</em> table contains general (non-price) information and is
+index by <em>symbol</em>:</p>
+<pre>
             symbol              varchar(12) not null,
             name                varchar(64) not null,
             exchange            varchar(16) not null,
@@ -87,13 +93,14 @@ index by <EM>symbol</EM>:</P>
             earnings            float4,
             dividend            float4,
             p_e_ratio           float4,
-            avg_volume          int4</PRE>
-<P>This table is updated by overwriting the previous content.</P>
-<P>
-<H2><A NAME="the stockprices table">THE STOCKPRICES TABLE</A></H2>
-<P>The <EM>stockprices</EM> table contains (daily) price and volume
-information. It is indexed by both <EM>date</EM> and <EM>symbol</EM>:</P>
-<PRE>
+            avg_volume          int4</pre>
+<p>This table is updated by overwriting the previous content.</p>
+<p>
+</p>
+<h2><a name="the_stockprices_table">THE STOCKPRICES TABLE</a></h2>
+<p>The <em>stockprices</em> table contains (daily) price and volume
+information. It is indexed by both <em>date</em> and <em>symbol</em>:</p>
+<pre>
             symbol              varchar(12) not null,
             date                date,
             previous_close      float4,
@@ -104,12 +111,13 @@ information. It is indexed by both <EM>date</EM> and <EM>symbol</EM>:</P>
             day_change          float4,
             bid                 float4,
             ask                 float4,
-            volume              int4</PRE>
-<P>During updates, information is appended to this table.</P>
-<P>
-<H2><A NAME="the fxprices table">THE FXPRICES TABLE</A></H2>
-<P>The <EM>fxprices</EM> table contains (daily) foreign exchange rates. It can be used to calculate home market values of foreign stocks:</P>
-<PRE>
+            volume              int4</pre>
+<p>During updates, information is appended to this table.</p>
+<p>
+</p>
+<h2><a name="the_fxprices_table">THE FXPRICES TABLE</a></h2>
+<p>The <em>fxprices</em> table contains (daily) foreign exchange rates. It can be used to calculate home market values of foreign stocks:</p>
+<pre>
             currency            varchar(12) not null,
             date                date,
             previous_close      float4,
@@ -117,64 +125,70 @@ information. It is indexed by both <EM>date</EM> and <EM>symbol</EM>:</P>
             day_low             float4,
             day_high            float4,
             day_close           float4,
-            day_change          float4</PRE>
-<P>Similar to the <EM>stockprices</EM> table, it is index on <EM>date</EM> and <EM>symbol</EM>.</P>
-<P>
-<H2><A NAME="the stockportfolio table">THE STOCKPORTFOLIO TABLE</A></H2>
-<P>The <EM>portfolio</EM> table contains contains the holdings information:</P>
-<PRE>
+            day_change          float4</pre>
+<p>Similar to the <em>stockprices</em> table, it is index on <em>date</em> and <em>symbol</em>.</p>
+<p>
+</p>
+<h2><a name="the_stockportfolio_table">THE STOCKPORTFOLIO TABLE</a></h2>
+<p>The <em>portfolio</em> table contains contains the holdings information:</p>
+<pre>
             symbol              varchar(16) not null,
             shares              float4,
             currency            varchar(12),
             type                varchar(16),
             owner               varchar(16),
             cost                float(4),
-            date                date</PRE>
-<P>It is indexed on <EM>symbol,owner,date</EM>.</P>
-<P>
-<H2><A NAME="the indices table">THE INDICES TABLE</A></H2>
-<P>The <EM>indices</EM> table links a stock <EM>symbol</EM> with one or several
-market indices:</P>
-<PRE>
+            date                date</pre>
+<p>It is indexed on <em>symbol,owner,date</em>.</p>
+<p>
+</p>
+<h2><a name="the_indices_table">THE INDICES TABLE</a></h2>
+<p>The <em>indices</em> table links a stock <em>symbol</em> with one or several
+market indices:</p>
+<pre>
             symbol              varchar(12) not null,
-            stockindex          varchar(12) not null</PRE>
-<P>
-<HR>
-<H1><A NAME="bugs">BUGS</A></H1>
-<P><STRONG>Finance::BeanCounter</STRONG> and <STRONG>beancounter</STRONG> are so fresh that there are
-only missing features :)</P>
-<P>On a more serious note, this code (or its earlier predecessors) have
-been in use since the fall of 1998.</P>
-<P>Known bugs or limitations are documented in TODO file in the source
-package.</P>
-<P>
-<HR>
-<H1><A NAME="see also">SEE ALSO</A></H1>
-<P><EM>beancounter.1</EM>, <EM>smtm.1</EM>, <EM>Finance::YahooQuote.3pm</EM>,
-<EM>LWP.3pm</EM>, <EM>Date::Manip.3pm</EM></P>
-<P>
-<HR>
-<H1><A NAME="copyright">COPYRIGHT</A></H1>
-<P>Finance::BeanCounter.pm  (c) 2000 -- 2002 by Dirk Eddelbuettel &lt;<A HREF="mailto:edd@debian.org">edd@debian.org</A>&gt;</P>
-<P>Updates to this program might appear at 
-<EM><A HREF="http://eddelbuettel.com/dirk/code/beancounter.html">http://eddelbuettel.com/dirk/code/beancounter.html</A></EM>.</P>
-<P>This program is free software; you can redistribute it and/or modify
+            stockindex          varchar(12) not null</pre>
+<p>
+</p>
+<hr />
+<h1><a name="bugs">BUGS</a></h1>
+<p><strong>Finance::BeanCounter</strong> and <strong>beancounter</strong> are so fresh that there are
+only missing features :)</p>
+<p>On a more serious note, this code (or its earlier predecessors) have
+been in use since the fall of 1998.</p>
+<p>Known bugs or limitations are documented in TODO file in the source
+package.</p>
+<p>
+</p>
+<hr />
+<h1><a name="see_also">SEE ALSO</a></h1>
+<p><em>beancounter.1</em>, <em>smtm.1</em>, <em>Finance::YahooQuote.3pm</em>,
+<em>LWP.3pm</em>, <em>Date::Manip.3pm</em></p>
+<p>
+</p>
+<hr />
+<h1><a name="copyright">COPYRIGHT</a></h1>
+<p>Finance::BeanCounter.pm  (c) 2000 -- 2002 by Dirk Eddelbuettel &lt;<a href="mailto:edd@debian.org">edd@debian.org</a>&gt;</p>
+<p>Updates to this program might appear at 
+<em><a href="http://eddelbuettel.com/dirk/code/beancounter.html">http://eddelbuettel.com/dirk/code/beancounter.html</a></em>.</p>
+<p>This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.  There is NO warranty whatsoever.</P>
-<P>The information that you obtain with this program may be copyrighted
+(at your option) any later version.  There is NO warranty whatsoever.</p>
+<p>The information that you obtain with this program may be copyrighted
 by Yahoo! Inc., and is governed by their usage license.  See
-<EM><A HREF="http://www.yahoo.com/docs/info/gen_disclaimer.html">http://www.yahoo.com/docs/info/gen_disclaimer.html</A></EM> for more
-information.</P>
-<P>
-<HR>
-<H1><A NAME="acknowledgements">ACKNOWLEDGEMENTS</A></H1>
-<P>The Finance::YahooQuote module by Dj Padzensky (on the web at
-<EM><A HREF="http://www.padz.net/~djpadz/YahooQuote/">http://www.padz.net/~djpadz/YahooQuote/</A></EM>) served as the backbone for
+<em><a href="http://www.yahoo.com/docs/info/gen_disclaimer.html">http://www.yahoo.com/docs/info/gen_disclaimer.html</a></em> for more
+information.</p>
+<p>
+</p>
+<hr />
+<h1><a name="acknowledgements">ACKNOWLEDGEMENTS</a></h1>
+<p>The Finance::YahooQuote module by Dj Padzensky (on the web at
+<em><a href="http://www.padz.net/~djpadz/YahooQuote/">http://www.padz.net/~djpadz/YahooQuote/</a></em>) served as the backbone for
 data retrieval, and a guideline for the extension to the non-North
 American quotes which was already very useful for the real-time ticker 
-<EM><A HREF="http://eddelbuettel.com/dirk/code/smtm.html">http://eddelbuettel.com/dirk/code/smtm.html</A></EM>.</P>
+<em><a href="http://eddelbuettel.com/dirk/code/smtm.html">http://eddelbuettel.com/dirk/code/smtm.html</a></em>.</p>
 
-</BODY>
+</body>
 
-</HTML>
+</html>

@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.42 2003/04/26 21:50:30 edd Exp edd $
+#   $Id: beancounter,v 1.43 2003/11/29 03:19:25 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -32,12 +32,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.42 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.43 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.6.2";		# updated from the debian/rules Makefile
+my $version = "0.6.1";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2003/04/26 21:50:30 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2003/11/29 03:19:25 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -271,9 +271,9 @@ sub display_status {
   my ($date, $pretty_date, $prices, $pricedates, $fx_prices, $shares, $fx,
       $cost, $pdate, $cash) = @_;
 
-  my ($tl,$fl) = build_lines(78);
+  my ($tl,$fl) = build_lines(79);
   print "$tl\n" . "\t\t\tPortfolio Status on $pretty_date\n$fl\n";
-  printf("%*s %6s %12s %17s %12s %10s\n%s\n",
+  printf("%*s %6s %12s %17s %12s %11s\n%s\n",
 	 -16, "Name", "Shares", "Close", "Position", "Held", 
 	 "Return", $fl);
   my (%value, %totalshares);
@@ -302,7 +302,7 @@ sub display_status {
 	$assetbase += $invested;
       }
     }
-    printf("%*s %6d    %3s %8.2f    %3s %10.2f   %s %s\n", 
+    printf("%*s %6d    %3s %8.2f    %3s %10.2f   %s  %s\n", 
 	   -16, substr($name,0,16), 
 	   $totalshares{$name},  
 	   $fx->{$name}, 
@@ -314,7 +314,7 @@ sub display_status {
     $assets += $value;
   }
 
-  foreach my $name (sort keys %{$cash}) {
+  foreach my $name (sort keys %{$cash}) { # cash part
     my $value = $cash->{$name}{value} * $fx_prices->{$cash->{$name}{fx}} 
       / $fx_prices->{$Config{currency}}; # adjust for FX
     $assets += $value;
@@ -330,7 +330,7 @@ sub display_status {
   print "$fl\n";
   printf("%-16s %29s %10.2f %20s\n", 
 	 "Grand Total",  $Config{currency}, $assets, 
-	 $assetbase ? sprintf("%19.2f%%",$weightedreturn/$assetbase) : "NaN");
+	 $assetbase ? sprintf("%20.2f%%",$weightedreturn/$assetbase) : "NaN");
   print "$fl\n";
   print "Returns are annualized if the holding period exceeds one year.\n";
   print "$tl\n";
@@ -349,15 +349,15 @@ sub display_riskreport {
     $assets += $pos->{$pkey};
   }
 
-  my ($tl,$fl) = build_lines(78);
+  my ($tl,$fl) = build_lines(79);
   print "$tl\n" . "\t   Portfolio Risk on $pretty_date " .
     "going back to $pretty_prev_date\n$fl\n";
-  printf("%*s  %15s  %13s %10s %8s %8s\n%s\n",
+  printf("%*s  %15s  %13s %10s %9s %8s\n%s\n",
 	 -16, "Name", "Position", "1% Profit/Loss", "Volatility", 
 	 "VaR", "margVaR", $tl); 
 
   foreach my $pkey (sort keys %$pos) {
-    printf("%-16s  %3s %11.2f %13s %9.1f%% %8d %8d\n", 
+    printf("%-16s  %3s %11.2f %13s %9.1f%%  %8d %8d\n", 
 	   substr($pkey,0,16), 
 	   $Config{currency},	# NOT $fx->{$pkey}, !!
 	   $pos->{$pkey}, 
@@ -370,17 +370,14 @@ sub display_riskreport {
 	   -$var{$pkey},
 	  $margvar->{$pkey});
   }
-  printf("$fl\n%-16s  %3s %11.2f  %24.1f%% %8d\n$fl\n", 
+  printf("$fl\n%-16s  %3s %11.2f  %24.1f%%  %8d\n$fl\n", 
 	 "Portfolio level", $Config{currency}, $assets,
 	 $var/$crit/$assets*100*sqrt(252), # back volatility out of VaR
 	 -$var);
-  printf("%s is %4.1f%% of assets, or %5.1f%% of VaR sum of %11d\n%s\n", 
+  printf("%s is %4.1f%% of assets, or %5.1f%% of VaR sum of %12d\n%s\n", 
 	 "Portfolio VaR", $var/$assets*100, $var/$varsum*100, -$varsum, $tl);
   print 
-"VaR calculations use a  99% confidence level and  1-day horizon.  Marginal VaR
-is the change to the portfolio VaR attributable to adding this position.  Com-
-puting the  1%  quintile of the return distribution,  which can be viewed as a 
-non-parametric VaR estimate, requires at least 100 observations.\n";
+"VaR calculations use a 99% confidence level and 1-day horizon.  Marginal VaR is\nthe change to the portfolio VaR attributable to adding this position. Computing\nthe 1% quintile of the return distribution,  which can be viewed as a non-para-\nmetric VaR estimate, requires at least 100 observations.\n";
   printf("$tl\n");
 }
 
@@ -436,13 +433,14 @@ sub portfolio_retracement {
     $totalshares{$name} += $shares->{$key};
   }
 
-  my $text = "Retracement";
-  $text = "Advances" if $mode eq "advance";
+  my $text = ($mode eq "advance") ? "Advances" : "Retracement";
 
   my ($tl,$fl) = build_lines(79);
   my ($totaldown, $weightedup, $assetbase) = (0,0,0);
   print "$tl\n" . "$text\t shares    price      value  $prev_date" .
-    " to $date  unreal. loss\n$fl\n";
+    " to $date  unreal. ";
+  print "" . ($mode eq "advance") ? "gain" : "loss";
+  print "\n$fl\n";
   foreach (sort keys %$prices) {
     my ($downperc,$downamount,$refprice);
     $refprice = $highprev->{$ARG}; # compare to recent high, or low for short

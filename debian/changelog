@@ -1,3 +1,14 @@
+beancounter (0.6.3) unstable; urgency=low
+
+  * Bug fix release:
+
+      - BeanCounter.pm: Allow six-column format for DatabaseHistoricalFXData
+        to reflect a change in the Data returned by Yahoo! (Closes: 222408)
+  
+      - beancounter: Small changes to better align reports on 79 columns
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Fri, 28 Nov 2003 21:33:16 -0600
+
 beancounter (0.6.2) unstable; urgency=low
 
   * Bug fix release:
