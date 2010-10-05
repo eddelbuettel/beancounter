@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.18 2002/03/11 02:05:26 edd Exp $
+#   $Id: setup_beancounter,v 1.21 2002/12/30 01:59:28 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -42,16 +42,24 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.5.0'
+VERSION='0.6.0'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'
 #DBSYSTEM='MySQL'
 SCHEMA_ONLY=0
 
+DAYOFWEEK=$(date +"%u")
+if [ "$DAYOFWEEK" -gt 5 ] || [ "$DAYOFWEEK" -eq 1 ] 
+then
+    LASTBIZDAY="last friday"
+else
+    LASTBIZDAY="yesterday"
+fi
+
 # Dow Jones Industrial Average 
 # see for example http://www.amex.com/indexshares/index_shares_diamonds_list.stm
-DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HWP HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG SBC UTX WMT"
+DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG SBC UTX WMT"
 
 # S&P500 is at http://www.spglobal.com/ssindexmain500text.html
 # NASDAQ is at http://www.nasdaq.com/asp/nasdaq100_activity.stm
@@ -273,7 +281,7 @@ function exit_if_exists()
 	echo ""
 	echo "If you want to delete the exiting database, use"
 	echo "    dropdb $DATABASE       	for PostgreSQL"
-	echo "    mysqladmin drop $DATABASE	for MySQL"
+	echo "    mysqladmin -f drop $DATABASE	for MySQL"
 	echo ""
 	exit 1
     fi
@@ -437,25 +445,30 @@ fi
 echo "Filling $DATABASE database tables with DJIA stocks"
 execute "$BEANCOUNTER addindex DJIA $DJIA"
 
-# create an example of two tech stocks
+# create an example of tech stocks
 echo "Filling $DATABASE (sample) portfolio"
-execute "$BEANCOUNTER addportfolio CSCO:20:USD NT:20:USD"
+execute "$BEANCOUNTER addportfolio CSCO:50:USD NT.TO:100:CAD SIEGn.DE:10:EUR CGEP.PA:50:EUR"
 
 echo -n "Filling $DATABASE with stock info and most recent prices "
 echo "for DJIA stocks"
 execute "$BEANCOUNTER addstock $DJIA"
 
 echo "Filling $DATABASE with historical prices for example portfolio stocks"
-execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date 'friday 1 week ago' CSCO NT"
+execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' CSCO NT.TO SIEGn.DE CGEP.PA"
+
+echo "Filling $DATABASE with historical fx prices for EUR and CAD"
+execute "$BEANCOUNTER fxbackpopulate --prevdate '1 year ago'  --date '$LASTBIZDAY' EUR CAD"
 
 echo "Running portfolio pl report on (sample) portfolio"
-execute "$BEANCOUNTER plreport"
+execute "$BEANCOUNTER plreport --date '$LASTBIZDAY'"
 
-echo "Running portfolio dayendreport on (sample) portfolio"
-execute "$BEANCOUNTER dayendreport"
+# dayendreport needs a db entry previous price which we don't get from 
+# all backpop routines / data combinations
+#echo "Running portfolio dayendreport on (sample) portfolio"
+#execute "$BEANCOUNTER dayendreport --date '$LASTBIZDAY'"
 
 echo "Running portfolio riskreport on (sample) portfolio"
-execute "$BEANCOUNTER risk"
+execute "$BEANCOUNTER risk --date '$LASTBIZDAY'"
 
 echo "Done."
 exit 0
@@ -477,8 +490,8 @@ of the features of B<beancounter>.
 
 =head1 OPTIONS
 
- -m       Use I<MySQL> as the backend over the default I<PostgreSQL>
- -n name  Use I<name> as the database instead of I<beancounter>
+ -m       Use MySQL as the backend over the default PostgreSQL
+ -n name  Use name as the database instead of beancounter
  -s       Do not fill the database, only create its schema
  -h       Show a simple help message
 
@@ -488,6 +501,6 @@ B<beancounter>(1), B<BeanCounter>(1), B<update_beancounter>(1)
 
 =head1 AUTHOR
 
-Dirk Eddelbuettel <edd@debian.org>
+Dirk Eddelbuettel edd@debian.org
 
 =cut

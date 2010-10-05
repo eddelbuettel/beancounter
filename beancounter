@@ -18,13 +18,12 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.32 2002/03/10 21:41:58 edd Exp $
+#   $Id: beancounter,v 1.37 2002/12/28 20:22:40 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
 
 use strict;			# be careful out there, son
-use Data::Dumper;
 use Date::Manip;		# general date parsing / calcs
 use English;			# explicit variable names
 use Getopt::Long;		# long options
@@ -34,11 +33,11 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.32 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.37 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.5.0";		# updated from the debian/rules Makefile
+my $version = "0.6.0";		# updated from the debian/rules Makefile
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2002/03/10 21:41:58 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2002/12/28 20:22:40 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -68,13 +67,15 @@ my %Config = GetConfig($rcfile, $debug, $verbose, $fxarg,
 		       $fxupdate, $command);
 my $dbh = ConnectToDb();
 
-if (InsufficientDatabaseSchema($dbh, $version)) {
+if (TestInsufficientDatabaseSchema($dbh, $version)) {
   warn "Database schema is not current. Please run 'update_beancounter'\n";
 } else {
   if ($command =~ /^plreport$/) {
     portfolio_report($sqlrestriction);
   } elsif ($command =~ /^backpopulate$/) {
     backpopulate(@ARGV);
+  } elsif ($command =~ /^fxbackpopulate$/) {
+    fxbackpopulate(@ARGV);
   } elsif ($command =~ /^addindex$/) {
     add_index(@ARGV);
   } elsif ($command =~ /^addstock$/) {
@@ -139,7 +140,7 @@ Usage:
 Commands:
     addindex index symbol1 [symbol2 [...]]	        
 				add stock(s) to market index 'index' 
-    addportfolio symbol:nb:fx[:type:owner:date:price] [...]	
+    addportfolio symbol:nb:fx[:type:owner:price:date] [...]	
                                 add n stock of s in currency fx to portfolio
 				optional type, owner, purchase price and
                                 purch. date can also be given (see example)
@@ -147,6 +148,7 @@ Commands:
     advanceement  	        report unrealized gains from lows
     allreports			combines, dayendreport, status and risk
     backpopulate  symbol ...	fill with historic data for given stock(s)
+    fxbackpopulate  symbol ...	fill with historic data for currency(ies)
     dailyjob			combines update, dayendreport, status + risk
     dayendreport		reports changes relative to the previous day
     delete arg ...		delete given stock(s) from database
@@ -178,6 +180,7 @@ Examples:
     beancounter addportfolio SUNW:100:USD:401k:joe:14.10:20011205 VOD.L:50:GBP
     beancounter addstock CBOT LNUX RHAT COR.TO
     beancounter backpopulate MSFT SUNW --prevdate 19940101 --date 19983112
+    beancounter fxbackpopulate EUR --prevdate 20010101 --date yesterday
     beancounter dayendreport --restriction \"type = '401k'\"
     beancounter status --date 20000816 --restriction \"currency='USD'\"
 
@@ -545,7 +548,6 @@ sub portfolio_update {
   UpdateDatabase($dbh, $res);	# always update stock db
 }
 
-
 sub backpopulate {
   my @arg = @_;
   my $fromdate = 19990101;	# default to start in Jan of 1999
@@ -566,6 +568,31 @@ sub backpopulate {
       DatabaseHistoricalData($dbh, $r->[0], @arr);
     }
     $sth->finish;
+  }
+}
+
+sub fxbackpopulate {
+  my @arg = @_;
+  my $fromdate = 20000101;	# default to start in Jan of 2000
+  my $todate = UnixDate(ParseDate("yesterday"),"%Y%m%d");
+
+  $fromdate = UnixDate(ParseDate($prevdatearg),"%Y%m%d") if ($prevdatearg); 
+  $todate   = UnixDate(ParseDate($datearg),"%Y%m%d") if ($datearg); 
+
+  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
+
+  foreach my $iso (@arg) {
+    my $fx = $iso2yahoo->{$iso};
+    if (defined($fx) and $fx ne "") {
+      print "   backpopulating $iso (using $fx) from $fromdate to $todate\n"
+	;#if $Config{debug};
+      my @arr = GetHistoricalData($fx, $fromdate, $todate);
+      PrintHistoricalData($fx, @arr) if $Config{verbose};
+      DatabaseHistoricalFXData($dbh, $fx, @arr);
+    } else {
+      print "** Ignoring $iso which is not currently known to " .
+	"the internal tables\n";
+    }
   }
 }
 
@@ -694,6 +721,7 @@ beancounter [options] command [command_arguments ...]
  dayendreport		   reports p/l changes relative to previous day
  delete arg ...	   	   delete given stock(s) from database
  destroydb                 delete the BeanCounter database
+ fxbackpopulate  arg ...   fill with historic data for currency(ies)
  plreport                  run an portfolio p/l report rel. to any day
  quote arg ...             report current data for given stock(s)
  retracement  		   report unrealized losses from highs (drawdowns)
@@ -731,12 +759,11 @@ stored data is evaluated to provide performance information. Several
 canned reports types are already available.
 
 Data is retrieved very efficiently in a single batch query per Yahoo!
-host from the Yahoo! Finance web sites. Support exists for North
-America (i.e. US and Canada), Europe (i.e. the Continent as well as
-Great Britain), several Asian stock markets, Australia and New
-Zealand. New markets are easy to add by following the (fairly
-extensively commented) Perl code. Patches are certainly welcome for
-further markets especially in Asia and Latin America!
+host from the Yahoo! Finance web sites using Finance::YahooQuote
+module (where version 0.18 or newer is required for proxy
+support). Support exists for North America (i.e. US and Canada),
+Europe (i.e. the Continent as well as Great Britain), several Asian
+stock markets, Australia and New Zealand. 
 
 B<beancounter> can aggregate the change in value for the entire
 portfolio over arbitrary time horizons (provided historical data has
@@ -764,9 +791,9 @@ installed, as as long as the database backend is found.
     the --restriction argument will be applied to the portfolio table,
     whereas the overall selection comes from the stockinfo table.
 
- beancounter addportfolio SUNW:100:USD:joe:401k:85.50:19991117 \
-                          IBM:100:USD:joe:401k:90.25:20000320  \
-                          SPY:50:USD:joe:ira:142.25:20000620
+ beancounter addportfolio SUNW:100:USD:401k:joe:85.50:19991117 \
+                          IBM:100:USD:401k:joe:90.25:20000320  \
+                          SPY:50:USD:ira:joe:142.25:20000620
 
     This adds the two stocks Sun and IBM to the 401k portfolio of Joe,
     as well as SP500 'Spiders' to his IRA portfolio. The stocks are
@@ -785,10 +812,23 @@ installed, as as long as the database backend is found.
     hardware companies. Note how the date specification is very general
     thanks to the underlying Date::Manip module.
 
+ beancounter fxbackpopulate --prevdate '1 year ago' \
+                          --date 'friday 1 week ago' CAD EUR GBP
+
+    This backpopulates the database with historic prices for these
+    three currencies. Note how the date specification is very general
+    thanks to the underlying Date::Manip module.
+
+    Unfortunately, Yahoo! is a little bone-headed in its implementation
+    of historic FX rates -- these are stored to only two decimals 
+    precision, just like stockprices. Unfortunately, convention is to
+    use at least four if not six. Because of the limited information, 
+    risk from FX changes will be underestimated.
+
  beancounter plreport --prevdate '1 month ago' --date 'today' \
 			--restriction "owner='joe'"
 
-    This calculates portfolio profits or losses over the last year. It
+    This calculates portfolio profits or losses over the last month. It
     also imposes the database restriction that only stocks owned by
     'joe' are to be included.
 
@@ -821,8 +861,8 @@ We suppose that B<beancounter> is installed and that the
 'setup_beancounter' command has been run. We can then create a
 two-stock (computer hardware) portfolio for Bob as follows:
 
- beancounter addportfolio SUNW:100:USD:bob:401k:85.50:19991117 \
-                          IBM:100:USD:bob:401k:90.25:20000320
+ beancounter addportfolio SUNW:100:USD:401k:bob:85.50:19991117 \
+                          IBM:100:USD:401k:bob:90.25:20000320
 
 Here we specify that 100 shares each of Sun and IBM, priced in US
 Dollars, are in Bob's portfolio which is tagged as a 401k retirement
@@ -831,8 +871,8 @@ account. The (fictitious) purchase price and date are also given.
 Let's suppose that Bill prefers networking equipment, and that he has
 a brokerage account in Canada:
 
- beancounter addportfolio CSCO:100:USD:bill:spec:78.00:19990817 \
-                          NT:200:CAD:bill:spec:cad:90.25:20000212
+ beancounter addportfolio CSCO:100:USD:spec:bill:78.00:19990817 \
+                          NT:200:CAD:spec:bill:cad:90.25:20000212
 
 Now we can backpopulate the database from 1998 onwards for all four stocks:
 
@@ -880,9 +920,10 @@ public holiday occurred, or if there was a data error at Yahoo!. Two
 dates can be specified which determine the period over which the
 profit or loss is computed. This will fail if price data (or currency
 data in the case of foreign stocks data) data is not available for
-either of those two dates. This can be restrictive for foreign stocks
+either of those two dates. This may be restrictive for foreign stocks
 where we cannot backpopulate due to lack of public data source for
-historical currency quotes.
+historical currency quotes. Major currencies can be retrieved from 
+Yahoo!, but only to two decimals precisions.
 
 B<dayendreport> is similar to B<plreport> but is always over a one-day
 period.  It also uses only one date record by calculating performance
@@ -943,10 +984,10 @@ B<addstock> adds stocks to the database. From then on data will be
 retrieved for the given symbol(s) and stored in the database whenever 
 the B<update> command is executed.
 
-B<addpopulate> fills the database with historic prices for the given
-symbols and date period. Note that this works for stocks only, but not
-for currencies due to the lack of a public source of historical FX
-prices.
+B<backpopulate> fills the database with historic prices for the given
+symbols and date period. Note that this works well for stocks and
+mutual fund. Options have no historic data stored. Currencies are
+stored with limited precision as noted above.
 
 B<quote> simply shows a price quote  for the given symbol(s).
 
@@ -974,7 +1015,7 @@ selected currency is used.
 
 B<--date> allows to choose a different reference date. This is then be
 be used by commands working on a date, or date period, such as
-B<plreport>, B<dayendreport>, B<backpopulate> or
+B<plreport>, B<dayendreport>, B<backpopulate>, B<fxbackpopulate> or
 B<status>. B<--prevdate> allows to choose a different start date for
 return calculations, or data gathering.
 
@@ -1102,8 +1143,57 @@ B<PostgreSQL> ODBC driver on my Debian GNU/Linux system:
    [ODBC]
    InstallDir = /usr/lib
 
-Suggestions are welcome of how to set B<beancounter> up with other
-ODBC libraries.
+Alternatively, the B<unixODBC> library can be used with the following
+scheme for F</etc/odbcinst.ini> (or F<~/.odbcinst.ini>) to define the
+Postgres database drivers
+
+   [PostgreSQL]
+   Description     = PostgreSQL ODBC driver for Linux and Windows
+   Driver          = /usr/lib/postgresql/lib/libodbcpsql.so
+   Setup           = /usr/lib/odbc/libodbcpsqlS.so
+   Debug           = 0
+   CommLog         = 0
+   FileUsage       = 1
+
+after which F</etc/odbc.ini> (or F<~/.odbc.ini>) can be used to define
+actual data sources as follows:
+
+   [PostgreSQL]
+   Description     = PostgreSQL template1
+   Driver          = PostgreSQL
+   Trace           = No
+   TraceFile       = /tmp/odbc.log
+   Database        = template1
+   Servername      = localhost
+   UserName        =
+   Password        =
+   Port            = 5432
+   Protocol        = 6.4
+   ReadOnly        = Yes
+   RowVersioning   = No
+   ShowSystemTables= No
+   ShowOidColumn   = No
+   FakeOidIndex    = No
+   ConnSettings    =
+   
+   [beancounter]
+   Description     = Beancounter DB (Postgresql)
+   Driver          = Postgresql
+   Trace           = No
+   TraceFile       =
+   Database        = beancounter
+   Servername      = some.db.host.com
+   UserName        =
+   Password        =
+   Port            = 5432
+   Protocol        = 6.4
+   ReadOnly        = No
+   RowVersioning   = No
+   ShowSystemTables= No
+   ShowOidColumn   = No
+   FakeOidIndex    = No
+   ConnSettings    =
+
 
 =head1 BUGS
 
@@ -1121,7 +1211,7 @@ F<LWP.3pm>, F<Date::Manip.3pm>, F<Statistics::Descriptive.3pm>
 beancounter is (c) 2000, 2001, 2002 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
-F<http://eddelbuettel.com/dirk/code/beancounter.html>.
+F<http://dirk.eddelbuettel.com/code/beancounter.html>.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1135,10 +1225,10 @@ information.
 
 =head1 ACKNOWLEDGEMENTS
 
-The Finance::YahooQuote module by Dj Padzensky (on the web at
-F<http://www.padz.net/~djpadz/YahooQuote/>) served as the backbone for
-data retrieval, and a guideline for the extension to the non-North
-American quotes which was already very useful for the real-time ticker 
-F<http://eddelbuettel.com/dirk/code/smtm.html>.
+The Finance::YahooQuote module, originally written by Dj Padzensky
+(and on the web at F<http://www.padz.net/~djpadz/YahooQuote/> as well
+as at F<http://dirk.eddelbuettel.com/code/yahooquote>) serves as the
+backbone for data retrieval, which was also already very useful for the
+real-time ticker F<http://dirk.eddelbuettel.com/code/smtm.html>.
 
 =cut

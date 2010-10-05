@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.37 2002/03/02 04:28:21 edd Exp $
+#  $Id: BeanCounter.pm,v 1.44 2002/12/28 20:21:55 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -29,8 +29,7 @@ use Data::Dumper;		# debugging aid
 use Date::Manip;		# for date parsing
 use DBI;			# for the Perl interface to the database
 use English;			# friendlier variable names
-use HTTP::Request::Common;	# grab data from Yahoo's web interface
-use LWP::UserAgent;		# for data queries from http://quote.yahoo.com
+use Finance::YahooQuote;	# fetch quotes from Yahoo!
 use POSIX qw(strftime);		# for date formatting
 use Statistics::Descriptive;	# simple statistical functions
 use Text::ParseWords;		# parse .csv data more reliably
@@ -39,9 +38,10 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT = qw(BeanCounterVersion
 	     CloseDB
 	     ConnectToDb
-	     InsufficientDatabaseSchema
+	     TestInsufficientDatabaseSchema
 	     DatabaseDailyData
 	     DatabaseHistoricalData
+	     DatabaseHistoricalFXData
 	     DatabaseInfoData
 	     ExistsDailyData
 	     ExistsFXDailyData
@@ -49,9 +49,9 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     GetCashData
 	     GetConfig
 	     GetDate
-	     GetDateEU
 	     GetDailyData
 	     GetFXData
+	     GetFXMaps
 	     GetHistoricalData
 	     GetPriceData
 	     GetRetracementData
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.37 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.44 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -110,7 +110,7 @@ sub CloseDB {
   $dbh->disconnect;
 }
 
-sub InsufficientDatabaseSchema($$) {
+sub TestInsufficientDatabaseSchema($$) {
   my ($dbh, $version) = @_;
   my @tables = $dbh->tables();
   die "Database does not contain table beancounter. " .
@@ -122,7 +122,7 @@ sub InsufficientDatabaseSchema($$) {
   $schema =~ s/\.//g;		# should be more general ...
   print "Database has schema $schema. requiring at least $version\n" 
     if $Config{debug};
-  return ($version < $schema);
+  return ($version lt $schema);
 }
 
 sub GetTodaysAndPreviousDates {
@@ -250,97 +250,15 @@ sub GetCashData {
 }
 
 sub GetDailyData {		# use Finance::YahooQuote::getquote
-  my @Args = @_;
   # This uses the 'return an entire array' approach of Finance::YahooQuote.
-  my (@NA,@NAX,@EU,@UK,@SG,@Res);	# arrays of symbols by server, results
-  my $na = "N/A";
-  foreach $ARG (@Args) {		# sort stock symbol
-    if (IsAsiaAustraliaNZ($ARG)) {	# if it's Asian, Australian or NZ
-      push @SG, $ARG;	 
-    } elsif (IsBritish($ARG)) {	# or if it is from London
-      push @UK, $ARG;	
-    } elsif (IsUSCanadaOption($ARG)) {
-      push @NAX, $ARG;		# or if it is Europe
-    } elsif (IsNonUSCanada($ARG)) {
-      push @EU, $ARG;		# or if it is Europe
-    } else {
-      push @NA, $ARG;		# else use the default: North America
-    }
-  }
+  my @Args = @_;
 
-  # North America (i.e. NYSE, Nasdaq, AMEX, TSE, CDNX, non-cross FX rates)
-  # in: name,symbol,price,last date (m/d/y),time,change,percent,volume,avg vol,
-  #     bid, ask, previous,open,day range,52 week range,eps,p/e,div,divyld, cap
-  if ($#NA > -1) {		# if there are stocks for Yahoo! North America
-    my $url = "http://quote.yahoo.com/d" .
-      "?f=snl1d1t1c1p2va2bapomwerr1dyj1x&s=";
-    my $array = GetQuote($url,@NA); # get all North American quotes
-    push @Res, (@$array);	# and store the entire array of arrays 
-  }
-
-  # North American option 
-  # in: name,symbol,price,last date (m/d/y),time,change,percent,volume,avg vol,
-  #     bid, ask, previous,open,day range,52 week range,eps,p/e,div,divyld, cap
-  if ($#NAX > -1) {		# if there are stocks for Yahoo! North America
-    my $url = "http://finance.yahoo.com/d" .
-      "?f=snl1d1t1c1p2vbapom&s="; 
-    my $array = GetQuote($url,@NAX); # get all North American quotes
-    foreach my $r (@$array) {	# loop over all returned symbols
-      my @arr = [ @$r[0..7],	# symb,name,last,date,time,chg,pcchg,v
-		  $na, @$r[8..12], # avgvol, bid, ask, previous, open, dayrange
-		  "$na - $na",	# 52wkrange, eps, pe, div, divyld, cap
-		  $na, $na, $na, 
-		  $na, $na, $na, 
-		  "Option"];
-      push @Res, @arr;		# and store the entire array of arrays 
-    }
-  }
-
-
-  # UK quotes
-  if ($#UK > -1) { 		# if there are stocks for Yahoo! UK
-    my $url = "http://uk.finance.yahoo.com/d/quotes.csv?" .
-      "&f=snl1d1t1c1p2vpoghx&s=" ;
-    my $array = GetQuote($url,@UK);
-    foreach my $r (@$array) {	# loop over all returned symbols
-      ($r->[12]) = ($r->[12] =~ m/<small>(.*)<\/small>/); # get exchange
-      my @arr = [ @$r[0..7], $na, $na, $na, @$r[8..9],
-		 "$r->[10] - $r->[11]", "$na - $na", $na, $na, $na, 
-		 $na, $na, $na, "$r->[12]"];
-      push @Res, @arr;		# and return arranges just as NA
-    } 
-  }
-
-  # (Continental) European quotes
-  if ($#EU > -1) { 		# if there are stocks for Yahoo! UK
-    ## my $url = "http://finanzen.de.yahoo.com/d/quotes.csv" . 
-    my $url = "http://de.finance.yahoo.com/d/quotes.csv" . 
-      "?f=snl1d1t1c1p2vpoghx&s=" ; 
-    my $array = GetQuote($url, @EU);
-    foreach my $r (@$array) {
-      # we retrieve: symbol, name, close, date, time, change, percent change
-      #              volume, avg vol, previous, open, low, high, exchange
-      my @arr = [ @$r[0..7], $na, $na, $na, @$r[8..9],
-		 "$r->[10] - $r->[11]", "$na - $na", $na, $na, $na, 
-		 $na, $na, $na, "$r->[12]"];
-      push @Res, @arr;
-    } 
-  }
-
-  # Asia: Singapore, HongKong, Australia, New Zealand, ...
-  if ($#SG > -1) { 		# if there are stocks for Yahoo! SG
-    my $URL = "http://sg.finance.yahoo.com/d/quotes.csv" .
-     "?f=snl1d1t1c1p2vbapomwerr1dyx&s=" ;
-    my $array = GetQuote($URL,@SG); # Singapore quotes
-    for my $r (@$array) {
-      # symbol, name, price, date, time, change, %change      
-      # vol, avg vol, bid, ask, previous, open, day range,year range,
-      # eps,p/e,div date,div,yld, exchange -- avg vol and market cap missing
-      my @arr = [ @$r[0..7], $na, @$r[8..18], $na, $r->[19]  ];
-      push @Res, @arr;
-    }
-  } 
-
+  #my $url = "http://quote.yahoo.com/d" .
+  #  "?f=snl1d1t1c1p2va2bapomwerr1dyj1x&s=";
+  #my $array = GetQuote($url,@NA); # get all North American quotes
+  my $array = getquote(@Args);	# get North American quotes
+  push @Res, (@$array);	# and store the entire array of arrays 
+  
   print Dumper(\@Res) if $Config{debug};
   return @Res;
 }
@@ -377,12 +295,12 @@ sub GetHistoricalData {		# get a batch of historical quotes from Yahoo!
   my $ua = RequestAgent->new;
   $ua->env_proxy;		# proxy settings from *_proxy env. variables.
   $ua->proxy('http', $Config{proxy}) if $Config{proxy};  # or config vars
-  my ($a,$b,$c,$d,$e,$f);	# we need the date as yy, mm and dd
-  ($c,$a,$b) = ($from =~ m/\d\d(\d\d)(\d\d)(\d\d)/);
-  ($f,$d,$e) = ($to =~ m/\d\d(\d\d)(\d\d)(\d\d)/);
-  # Create a request for symbol from 19880101 to 19990114
-  my $req = new HTTP::Request GET => "http://chart.yahoo.com/table.csv?" .
-    "s=$symbol&a=$a&b=$b&c=$c&d=$d&e=$e&f=$f&g=d&q=q&y=0&z=$symbol&x=.csv";
+  my ($a,$b,$c,$d,$e,$f);	# we need the date as yyyy, mm and dd
+  ($c,$a,$b) = ($from =~ m/(\d\d\d\d)(\d\d)(\d\d)/);
+  ($f,$d,$e) = ($to =~ m/(\d\d\d\d)(\d\d)(\d\d)/);
+  --$a; --$d; # month is zero-based
+  my $req = new HTTP::Request GET => "http://table.finance.yahoo.com/" .
+    "table.csv?a=$a&b=$b&c=$c&d=$d&e=$e&f=$f&s=$symbol&y=0&g=d&ignore=.csv";
   my $res = $ua->request($req);  # Pass request to user agent and get response
   if ($res->is_success) {	# Check the outcome of the response
     return split(/\n/, $res->content);
@@ -490,6 +408,20 @@ sub GetQuote {			# taken from Dj's Finance::YahooQuote
   my ($URL,@symbols) = @_;	# and modified to allow for different URL
   my ($x,@q,@qr,$ua,$url);	# and the simple filtering below as well
 				# the firewall code below
+  if (defined($Config{proxy})) {
+    $Finance::YahooQuote::PROXY = $Config{proxy};
+  }
+  if (defined($Config{firewall}) and
+      $Config{firewall} ne "" and 
+      $Config{firewall} =~ m/.*:.*/) {
+    my @q = split(':', $Config{firewall}, 2);
+    $Finance::YahooQuote::PROXYUSER = $q[0];
+    $Finance::YahooQuote::PROXYPASSWD = $q[1];
+  }
+  if (defined($Config{timeout})) {
+    $Finance::YahooQuote::TIMEOUT = $Config{timeout} if $Config{timeout};
+  }
+
   undef @qr;			# reset result structure
   while (scalar(@symbols) > 0) {# while we have symbols to query
     my (@symbols_100);		# Peter Kim's patch to batch 100 at a time
@@ -500,29 +432,9 @@ sub GetQuote {			# taken from Dj's Finance::YahooQuote
       @symbols = ();		# and show we're done
     }
 
-    $x = $";			# this is Black Magic (TM)
-    $" = "+";			# lifted straight from DJ's YahooQuote.pm
-    $url = $URL."@symbols_100"; # concatenates all symbols with a +
-    $" = $x;			# and then resets the concat operator
+    my $array = getquote(@symbols_100);	# get quotes using Finance::YahooQ.
+    push(@qr,[@array]);		# and store result as anon array
 
-    $ua = RequestAgent->new;	# get a new "web agent"
-    $ua->env_proxy;		# proxy settings from *_proxy env. variables
-				# or the proxy option, if specified
-    $ua->proxy('http', $Config{proxy}) if $Config{proxy};
-    $ua->timeout($Config{timeout}) if $Config{timeout};
-
-    # now loop over the content of the current batch
-    foreach (split('\n',$ua->request(GET $url)->content)) {
-      next if m/^\"SYMBOL\",\"PRICE\"/; # skip headers from Yahoo! UK 
-      next if m/index.html/;	# try csv mode at Yahoo! UK to see this bug
-      $ARG =~ s/\r$//;		# kill DOS-ish end-of-line character
-      if (tr/;// >= 2) {	# with at least 2 ';', suspect European quote
-        $ARG =~ s/,/\./g;	# so harmonize it -- use . as decimal sep.
-        $ARG =~ s/;/,/g;	# and ; as field sep
-      }
-      @q = quotewords(',', 0, $ARG); # this parses the actual CSV records
-      push(@qr,[@q]);		# and store result as anon array
-    }
   }
   return \@qr;			# return a pointer to the results array
 }
@@ -842,7 +754,7 @@ sub DatabaseFXDailyData {
 
 sub DatabaseHistoricalData {
   my ($dbh, $symbol, @res) = @_;
-  my $checked = 0;		# flag to make sure is not nonsensical or errors
+  my $checked = 0;		# flag to ensure not nonsensical or errors
   my %data;			# hash to store data of various completenesses
   foreach $ARG (@res) {		# loop over all supplied symbols
     # make sure the first line of data is correct so we don't insert garbage
@@ -915,12 +827,77 @@ sub DatabaseHistoricalData {
 }
 
 
-sub DatabaseInfoData {		# update a row in the info table
+sub DatabaseHistoricalFXData {
+  my ($dbh, $symbol, @res) = @_;
+  my $checked = 0;		# flag to ensure not nonsensical or errors
+  my %data;			# hash to store data of various completenesses
+
+  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
+  my $fx = $yahoo2iso->{$symbol};
+  foreach $ARG (@res) {		# loop over all supplied symbols
+    # make sure the first line of data is correct so we don't insert garbage
+    if ($checked==0 and m/Date(,Open,High,Low)?,Close(,Volume)?/) {
+      $checked = tr/,//;
+      print "Checked now $checked\n" if $Config{verbose};
+    } elsif ($checked) {
+      my ($date, $open, $high, $low, $close, $volume, $cmd);
+      # based on the number of elements, ie columns, we split the parsing
+      if ($checked eq 5) {	# fx (and indices) have no volume
+	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
+	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
+	%data = (symbol    => $fx,
+		 date	   => $date,
+		 day_open  => $open,
+		 day_high  => $high,
+		 day_low   => $low,
+		 day_close => $close,
+		 volume    => undef); # never any volume info for FX
+      } else {			# no volume for indices
+	print "Unknown currency format: $ARG\n";
+      }
+
+      # now given the data, decide whether we add new data or update old data
+      if (ExistsFXDailyData($dbh,$fx,%data)) { # update data if it exists
+	$cmd = "update fxprices set ";
+	##$cmd .= "volume    = $data{volume},"    if defined($data{volume});
+	$cmd .= "day_open  = $data{day_open},"  if defined($data{day_open});
+	$cmd .= "day_low   = $data{day_low},"   if defined($data{day_low});
+	$cmd .= "day_high  = $data{day_high},"  if defined($data{day_high});
+	$cmd .= "day_close = $data{day_close} "   .
+	        "where currency = '$data{symbol}' " .
+		"and date     = '$data{date}'";
+      } else {			# insert
+	$cmd = "insert into fxprices (currency, date,";
+	$cmd .= "day_open," if defined($data{day_open});
+	$cmd .= "day_high," if defined($data{day_high});
+	$cmd .= "day_low,"  if defined($data{day_low});
+	$cmd .= "day_close";
+	##$cmd .= ",volume"  if defined($data{volume});
+	$cmd .= ") values ('$data{symbol}', '$data{date}', ";
+	$cmd .= "$data{day_open},"   if defined($data{day_open});
+	$cmd .= "$data{day_high},"   if defined($data{day_high});
+	$cmd .= "$data{day_low},"    if defined($data{day_low});
+	$cmd .= "$data{day_close}"; 
+	##$cmd .= ",$data{volume} "    if defined($data{volume});
+        $cmd .= ");";
+      }
+      print "$cmd\n" if $Config{debug};
+      $dbh->do($cmd) or die $dbh->errstr;
+      $dbh->commit();
+    } else {
+      ;				# do nothing with bad data
+    }
+  }
+  print "Done with $fx (using $symbol)\n" if $Config{verbose};
+}
+
+
+sub DatabaseInfoData {		# initialise a row in the info table
   my ($dbh, %hash) = @_;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     my $cmd = "insert into stockinfo (symbol, name, exchange, " .
 	      "  capitalisation, low_52weeks, high_52weeks, earnings, " .
-	      "  dividend, p_e_ratio, avg_volume) " .
+	      "  dividend, p_e_ratio, avg_volume, active) " .
 	      "values('$hash{$key}{symbol}'," .
 	         $dbh->quote($hash{$key}{name}) . ", " .
 	      "  '$hash{$key}{exchange}', " .
@@ -930,7 +907,8 @@ sub DatabaseInfoData {		# update a row in the info table
 	      "  $hash{$key}{earnings_per_share}," .
 	      "  $hash{$key}{dividend_per_share}," .
 	      "  $hash{$key}{price_earnings_ratio}," .
-	      "  $hash{$key}{average_volume})";
+	      "  $hash{$key}{average_volume}," .
+              "  't')";
     $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
     print "$cmd\n" if $Config{debug};
     print "$hash{$key}{symbol} " if $Config{verbose};
@@ -978,56 +956,6 @@ sub ExistsFXDailyData {
 sub GetDate {			# date can be "4:01PM" (same day) or "Jan 15"
   my ($value) = @_;		# Date::Manip knows how to deal with them...
   return UnixDate(ParseDate($value), "%Y%m%d");
-}
-
-
-sub GetDateEU {			# date in day/month/year format 
-  my ($v) = @_;		
-  if ($v =~ m/\d?\d:\d\d/) {
-    return GetDate($v);
-  } else {
-    my ($d,$m,$y);
-    ($d,$m,$y) = split(/\//, $v); # split on /
-    return GetDate("$m/$d/$y");	# and analyse reordered
-  }
-}
-
-
-sub IsAsiaAustraliaNZ {		# test if stock is Asia/Australia/NZ
-  my $arg = shift;
-  if ($arg =~ m/\.(\w+)$/ and ($1 =~ /^(SI|KL|JK|HK|TW|NS|KS|AX|NZ)$/)) {
-    return 1;			# true if there is an exchange symbol 
-  } else {			# and it is not Asia, Australia or New Zealand
-    return 0;
-  }
-}
-
-
-sub IsBritish {			# test if stock is from London-US or Canadian
-  my $arg = shift;
-  if ($arg =~ m/\.(\w+)$/ and ($1 =~ m/^L$/)) {
-    return 1;			# true if there is an exchange symbol 
-  } else {			# and it is London (.L)
-    return 0;
-  }
-}
-
-sub IsUSCanadaOption {		# test if option on US or Canadian stock
-  my $arg = shift;		
-  if ($arg =~ m/\.(\w+)$/ and ($1 =~ m/^X$/)) {
-    return 1;			# true if there is an exchange symbol 
-  } else {			# and it has option extension .X
-    return 0;
-  }
-}
-
-sub IsNonUSCanada {		# test if stock is non-US or Canadian
-  my $arg = shift;		# or OTC Bulletin Board ot Options
-  if ($arg =~ m/\.(\w+)$/ and ($1 !~ m/^(TO|V|M|OBX)$/)) {
-    return 1;			# true if there is an exchange symbol 
-  } else {			# and it is not Toronto/Vancouver/Montreal
-    return 0;
-  }
 }
 
 
@@ -1300,29 +1228,6 @@ sub UpdateTimestamp {
   print "$cmd\n" if $Config{debug};
   $dbh->do($cmd) or warn "UpdateTimestamp failed\n";
   $dbh->commit();
-}
-
-BEGIN {				# Local variant of LWP::UserAgent that 
-  use LWP;			# checks for user/password if document 
-  package RequestAgent;		# this code taken from lwp-request, see
-  no strict 'vars';		# the various LWP manual pages
-  @ISA = qw(LWP::UserAgent);
-
-  sub new { 
-    my $self = LWP::UserAgent::new(@_);
-    $self->agent("beancounter/$VERSION");
-    $self;
-  }
-
-  sub get_basic_credentials {
-    my $self = @_;
-    if (defined($Config{firewall}) and $Config{firewall} ne "" 
-	and $Config{firewall} =~ m/.*:.*/) {
-      return split(':', $Config{firewall}, 2);
-    } else {
-      return (undef, undef)
-    }
-  }
 }
 
 

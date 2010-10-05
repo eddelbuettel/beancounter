@@ -1,3 +1,65 @@
+beancounter (0.6.0) unstable; urgency=low
+
+  * New release with the following new features:
+
+    - Switched to using Finance::YahooQuote (>= 0.18) for quote
+      gathering after code we had here has been consolidated in the
+      module. This may require adjusting of (numeric) stock symbols for 
+      which updated_beancounter attempts to test.
+  
+    - New command 'fxbackpopulate' to grab historical currency data from
+      Yahoo!. With this added capability, portfolios with non-home country
+      stocks can run reports for profit/loss or risk without having to
+      built the database over time.
+  
+      The major bummer is that Yahoo! stores historic currency data in 
+      a braindead format of only two decimals so we get suboptimal 
+      accuracy. 
+  
+    - Changed setup_beancounter to transform example portfolio into one
+      composed of one stock each from US, CA, FR and DE. Backpopulates 
+      for prices and currencies and runs p/l and risk reports right
+      out of the box.
+  
+    - Simplified quote gathering code in BeanCounter.pm; requests for all 
+      markets can go against the main Yahoo! server.
+
+    - Applied patch by Ken Neighbors <ken@nsds.com> to use a different 
+      Yahoo! source URL for historic prices, correct a one-off error in 
+      date / month conversion and correct documentation.
+
+  * Detailed changes
+
+    - beancounter: New command (and function) 'fxbackpopulate'
+  
+    - beancounter: Corrected small mistakes in documentation via Ken's
+      patch, added documentation and examples re 'fxbackpopulate'
+  
+    - BeanCounter.pm: Ken's patch re other URL, and one-off month error
+  
+    - BeanCounter.pm: New function DatabaseHistoricalFXData
+    
+    - BeanCounter.pm: Commented out a lot of code no longer required as
+      all current price data can be had from one main Yahoo! source
+  
+    - BeanCounter.pm: Ensure new rows in 'stockinfo' table are set to
+      active
+
+    - BeanCounter.pm: Use Finance::YahooQuote, delete code thus made
+      redundant 
+  
+    - setup_beancounter: Updated HP to HPQ (from HWP) in Dow example 
+  
+    - setup_beancounter: Changed example portfolio from two US stocks to
+      one each from US,CA,FR,DE, added fxbackpopulate call for CAD and EUR
+  
+    - setup_beancounter: Smartened up the use of 'last business day' 
+      for the example portfolio: on weekends or Monday we use 'last 
+      friday', on other days we use 'yesterday' and made sure all 
+      example reports use this date
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Sun, 29 Dec 2002 20:01:06 -0600
+
 beancounter (0.5.1) unstable; urgency=low
 
   * setup_beancounter: Fill beancounter table with current version number 

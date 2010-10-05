@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: update_beancounter,v 1.8 2002/03/11 01:49:46 edd Exp $
+#   $Id: update_beancounter,v 1.10 2002/12/30 01:55:26 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -32,13 +32,14 @@ then
     USER=$(whoami)
 fi
 
-VERSION='0.5.0'
+VERSION='0.6.0'
 #DATABASE='testbean'
 DATABASE='beancounter'
 #PASSWORD=
 #DBSYSTEM='MySQL'
 DBSYSTEM='PostgreSQL'
 
+# -------------------------- Functions ----------------------------------
 function usage_and_exit()
 {
     cat<<EOF
@@ -50,6 +51,43 @@ Options:
     -h		Show this help
 EOF
     exit 0
+}
+
+function set_version_to_current()
+{
+    query="update beancounter set version = '$VERSION'"
+    echo $query | $DBCOMMAND 
+}
+
+# test if symbols are numeric (finance-yahooquote cannot retrieve
+# symbols like 555750.DE but deals fine with the more mnemonic symbols_
+function check_for_numeric_symbols()
+{
+    rc=0
+    query="select distinct symbol from stockinfo where active"
+    echo $query | $DBCOMMAND -t | grep -q "\b[[:digit:]]"
+    rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+	cat <<EOF
+
+Numeric symbols in database:
+  Your database appears to have numeric symbols. Beancounter has switched
+  to using Finance::YahooQuote as its backend for quote retrieval, and
+  Finance::YahooQuote may experience problems with stock symbols such as
+  '555750.F' (for Deutsche Telekom in Frankfurt, Germany) whereas the
+  equivalent 'DTEGN.F' is fully supported.
+
+  In order to use beancounter, you may need to convert the numeric symbols.
+  A helper script 'symbol_alias.sh' is included with Finance::YahooQuote;
+  it will find the mnemonic alias for a given numeric symbol. The script
+  'flip_symbol.sh' included with Beancounter can then be used to convert
+  the beancounter database from a given (numeric) symbol to a given textual
+  symbol.
+
+EOF
+    fi
+    return 0
 }
 
 # add 'active' column to stockinfo
@@ -197,6 +235,8 @@ function rename_if_not_exists_column()
     return 0
 }
 
+# -------------------------- Main ---------------------------------------
+
 while getopts ":mn:h" opt
 do
     case $opt in
@@ -251,9 +291,12 @@ add_active_if_needed
 
 add_beancounter_table_if_needed
 
+check_for_numeric_symbols
+
+set_version_to_current
+
 echo "Done."
 exit 0
-
 
 =head1 NAME
 
@@ -270,8 +313,8 @@ B<beancounter> from an older release to the current one.
 
 =head1 OPTIONS
 
- -m       Use I<MySQL> as the backend over the default I<PostgreSQL>
- -s name  Use I<name> as the database instead of I<beancounter>
+ -m       Use MySQL as the backend over the default PostgreSQL
+ -s name  Use name as the database instead of B<beancounter
  -h       Show a simple help message
 
 =head1 SEE ALSO
@@ -280,6 +323,6 @@ B<beancounter>(1), B<BeanCounter>(1), B<setup_beancounter>(1)
 
 =head1 AUTHOR
 
-Dirk Eddelbuettel <edd@debian.org>
+Dirk Eddelbuettel edd@debian.org
 
 =cut

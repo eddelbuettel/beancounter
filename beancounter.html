@@ -62,6 +62,7 @@
  dayendreport              reports p/l changes relative to previous day
  delete arg ...            delete given stock(s) from database
  destroydb                 delete the BeanCounter database
+ fxbackpopulate  arg ...   fill with historic data for currency(ies)
  plreport                  run an portfolio p/l report rel. to any day
  quote arg ...             report current data for given stock(s)
  retracement               report unrealized losses from highs (drawdowns)
@@ -99,12 +100,11 @@ driver could be used). The second main mode is data analysis where the
 stored data is evaluated to provide performance information. Several
 canned reports types are already available.</P>
 <P>Data is retrieved very efficiently in a single batch query per Yahoo!
-host from the Yahoo! Finance web sites. Support exists for North
-America (i.e. US and Canada), Europe (i.e. the Continent as well as
-Great Britain), several Asian stock markets, Australia and New
-Zealand. New markets are easy to add by following the (fairly
-extensively commented) Perl code. Patches are certainly welcome for
-further markets especially in Asia and Latin America!</P>
+host from the Yahoo! Finance web sites using Finance::YahooQuote
+module (where version 0.18 or newer is required for proxy
+support). Support exists for North America (i.e. US and Canada),
+Europe (i.e. the Continent as well as Great Britain), several Asian
+stock markets, Australia and New Zealand.</P>
 <P><STRONG>beancounter</STRONG> can aggregate the change in value for the entire
 portfolio over arbitrary time horizons (provided historical data has
 either been gathered or has been backpopulated). Using the powerful
@@ -131,9 +131,9 @@ installed, as as long as the database backend is found.</P>
     the --restriction argument will be applied to the portfolio table,
     whereas the overall selection comes from the stockinfo table.</PRE>
 <PRE>
- beancounter addportfolio SUNW:100:USD:joe:401k:85.50:19991117 \
-                          IBM:100:USD:joe:401k:90.25:20000320  \
-                          SPY:50:USD:joe:ira:142.25:20000620</PRE>
+ beancounter addportfolio SUNW:100:USD:401k:joe:85.50:19991117 \
+                          IBM:100:USD:401k:joe:90.25:20000320  \
+                          SPY:50:USD:ira:joe:142.25:20000620</PRE>
 <PRE>
     This adds the two stocks Sun and IBM to the 401k portfolio of Joe,
     as well as SP500 'Spiders' to his IRA portfolio. The stocks are
@@ -152,10 +152,23 @@ installed, as as long as the database backend is found.</P>
     hardware companies. Note how the date specification is very general
     thanks to the underlying Date::Manip module.</PRE>
 <PRE>
+ beancounter fxbackpopulate --prevdate '1 year ago' \
+                          --date 'friday 1 week ago' CAD EUR GBP</PRE>
+<PRE>
+    This backpopulates the database with historic prices for these
+    three currencies. Note how the date specification is very general
+    thanks to the underlying Date::Manip module.</PRE>
+<PRE>
+    Unfortunately, Yahoo! is a little bone-headed in its implementation
+    of historic FX rates -- these are stored to only two decimals 
+    precision, just like stockprices. Unfortunately, convention is to
+    use at least four if not six. Because of the limited information, 
+    risk from FX changes will be underestimated.</PRE>
+<PRE>
  beancounter plreport --prevdate '1 month ago' --date 'today' \
                         --restriction &quot;owner='joe'&quot;</PRE>
 <PRE>
-    This calculates portfolio profits or losses over the last year. It
+    This calculates portfolio profits or losses over the last month. It
     also imposes the database restriction that only stocks owned by
     'joe' are to be included.</PRE>
 <PRE>
@@ -187,16 +200,16 @@ The prices below are completely fictitious, as are the portfolios.</P>
 'setup_beancounter' command has been run. We can then create a
 two-stock (computer hardware) portfolio for Bob as follows:</P>
 <PRE>
- beancounter addportfolio SUNW:100:USD:bob:401k:85.50:19991117 \
-                          IBM:100:USD:bob:401k:90.25:20000320</PRE>
+ beancounter addportfolio SUNW:100:USD:401k:bob:85.50:19991117 \
+                          IBM:100:USD:401k:bob:90.25:20000320</PRE>
 <P>Here we specify that 100 shares each of Sun and IBM, priced in US
 Dollars, are in Bob's portfolio which is tagged as a 401k retirement
 account. The (fictitious) purchase price and date are also given.</P>
 <P>Let's suppose that Bill prefers networking equipment, and that he has
 a brokerage account in Canada:</P>
 <PRE>
- beancounter addportfolio CSCO:100:USD:bill:spec:78.00:19990817 \
-                          NT:200:CAD:bill:spec:cad:90.25:20000212</PRE>
+ beancounter addportfolio CSCO:100:USD:spec:bill:78.00:19990817 \
+                          NT:200:CAD:spec:bill:cad:90.25:20000212</PRE>
 <P>Now we can backpopulate the database from 1998 onwards for all four stocks:</P>
 <PRE>
  beancounter backpopulate --prevdate 19980101 CSCO IBM NT SUNW</PRE>
@@ -237,9 +250,10 @@ public holiday occurred, or if there was a data error at Yahoo!. Two
 dates can be specified which determine the period over which the
 profit or loss is computed. This will fail if price data (or currency
 data in the case of foreign stocks data) data is not available for
-either of those two dates. This can be restrictive for foreign stocks
+either of those two dates. This may be restrictive for foreign stocks
 where we cannot backpopulate due to lack of public data source for
-historical currency quotes.</P>
+historical currency quotes. Major currencies can be retrieved from 
+Yahoo!, but only to two decimals precisions.</P>
 <P><STRONG>dayendreport</STRONG> is similar to <STRONG>plreport</STRONG> but is always over a one-day
 period.  It also uses only one date record by calculating performance
 given the 'previous close' data.</P>
@@ -292,10 +306,10 @@ analysis references this table.</P>
 <P><STRONG>addstock</STRONG> adds stocks to the database. From then on data will be
 retrieved for the given <CODE>symbol(s)</CODE> and stored in the database whenever 
 the <STRONG>update</STRONG> command is executed.</P>
-<P><STRONG>addpopulate</STRONG> fills the database with historic prices for the given
-symbols and date period. Note that this works for stocks only, but not
-for currencies due to the lack of a public source of historical FX
-prices.</P>
+<P><STRONG>backpopulate</STRONG> fills the database with historic prices for the given
+symbols and date period. Note that this works well for stocks and
+mutual fund. Options have no historic data stored. Currencies are
+stored with limited precision as noted above.</P>
 <P><STRONG>quote</STRONG> simply shows a price quote  for the given symbol(s).</P>
 <P><STRONG>update</STRONG> updates the database with quotes for all stocks for the 
 given day. No output is generated making the command suitable for 
@@ -315,7 +329,7 @@ Instead of having all values converted to the default currency, the
 selected currency is used.</P>
 <P><STRONG>--date</STRONG> allows to choose a different reference date. This is then be
 be used by commands working on a date, or date period, such as
-<STRONG>plreport</STRONG>, <STRONG>dayendreport</STRONG>, <STRONG>backpopulate</STRONG> or
+<STRONG>plreport</STRONG>, <STRONG>dayendreport</STRONG>, <STRONG>backpopulate</STRONG>, <STRONG>fxbackpopulate</STRONG> or
 <STRONG>status</STRONG>. <STRONG>--prevdate</STRONG> allows to choose a different start date for
 return calculations, or data gathering.</P>
 <P><STRONG>--restriction</STRONG> can be used to restrict the database selection. The
@@ -427,8 +441,57 @@ following <EM>~/.odbc.ini</EM> work with the <STRONG>iODBC</STRONG> library and 
 <PRE>
    [ODBC]
    InstallDir = /usr/lib</PRE>
-<P>Suggestions are welcome of how to set <STRONG>beancounter</STRONG> up with other
-ODBC libraries.</P>
+<P>Alternatively, the <STRONG>unixODBC</STRONG> library can be used with the following
+scheme for <EM>/etc/odbcinst.ini</EM> (or <EM>~/.odbcinst.ini</EM>) to define the
+Postgres database drivers</P>
+<PRE>
+   [PostgreSQL]
+   Description     = PostgreSQL ODBC driver for Linux and Windows
+   Driver          = /usr/lib/postgresql/lib/libodbcpsql.so
+   Setup           = /usr/lib/odbc/libodbcpsqlS.so
+   Debug           = 0
+   CommLog         = 0
+   FileUsage       = 1</PRE>
+<P>after which <EM>/etc/odbc.ini</EM> (or <EM>~/.odbc.ini</EM>) can be used to define
+actual data sources as follows:</P>
+<PRE>
+   [PostgreSQL]
+   Description     = PostgreSQL template1
+   Driver          = PostgreSQL
+   Trace           = No
+   TraceFile       = /tmp/odbc.log
+   Database        = template1
+   Servername      = localhost
+   UserName        =
+   Password        =
+   Port            = 5432
+   Protocol        = 6.4
+   ReadOnly        = Yes
+   RowVersioning   = No
+   ShowSystemTables= No
+   ShowOidColumn   = No
+   FakeOidIndex    = No
+   ConnSettings    =
+</PRE>
+<PRE>
+
+   [beancounter]
+   Description     = Beancounter DB (Postgresql)
+   Driver          = Postgresql
+   Trace           = No
+   TraceFile       =
+   Database        = beancounter
+   Servername      = some.db.host.com
+   UserName        =
+   Password        =
+   Port            = 5432
+   Protocol        = 6.4
+   ReadOnly        = No
+   RowVersioning   = No
+   ShowSystemTables= No
+   ShowOidColumn   = No
+   FakeOidIndex    = No
+   ConnSettings    =</PRE>
 <P>
 <HR>
 <H1><A NAME="bugs">BUGS</A></H1>
@@ -445,7 +508,7 @@ its predecessors have been used by the author since the end of 1998.</P>
 <H1><A NAME="copyright">COPYRIGHT</A></H1>
 <P>beancounter is (c) 2000, 2001, 2002 by Dirk Eddelbuettel &lt;<A HREF="mailto:edd@debian.org">edd@debian.org</A>&gt;</P>
 <P>Updates to this program might appear at 
-<EM><A HREF="http://eddelbuettel.com/dirk/code/beancounter.html">http://eddelbuettel.com/dirk/code/beancounter.html</A></EM>.</P>
+<EM><A HREF="http://dirk.eddelbuettel.com/code/beancounter.html">http://dirk.eddelbuettel.com/code/beancounter.html</A></EM>.</P>
 <P>This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
@@ -457,11 +520,11 @@ information.</P>
 <P>
 <HR>
 <H1><A NAME="acknowledgements">ACKNOWLEDGEMENTS</A></H1>
-<P>The Finance::YahooQuote module by Dj Padzensky (on the web at
-<EM><A HREF="http://www.padz.net/~djpadz/YahooQuote/">http://www.padz.net/~djpadz/YahooQuote/</A></EM>) served as the backbone for
-data retrieval, and a guideline for the extension to the non-North
-American quotes which was already very useful for the real-time ticker 
-<EM><A HREF="http://eddelbuettel.com/dirk/code/smtm.html">http://eddelbuettel.com/dirk/code/smtm.html</A></EM>.</P>
+<P>The Finance::YahooQuote module, originally written by Dj Padzensky
+(and on the web at <EM><A HREF="http://www.padz.net/~djpadz/YahooQuote/">http://www.padz.net/~djpadz/YahooQuote/</A></EM> as well
+as at <EM><A HREF="http://dirk.eddelbuettel.com/code/yahooquote">http://dirk.eddelbuettel.com/code/yahooquote</A></EM>) serves as the
+backbone for data retrieval, which was also already very useful for the
+real-time ticker <EM><A HREF="http://dirk.eddelbuettel.com/code/smtm.html">http://dirk.eddelbuettel.com/code/smtm.html</A></EM>.</P>
 
 </BODY>
 

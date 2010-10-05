@@ -33,6 +33,7 @@
   -- but that means no quotes are available on US holidays. 
 
 * We also have no access to historical FX data for backpopulation
+  [ as of 0.6.0 we do, albeit at a grizzly two-decimals precision ]
 
 * there is also a plain error somewhere as eg a DEM based portfolio sees a
   return even though a EUR traded stock didn't move -- can't really happen
