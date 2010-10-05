@@ -18,4 +18,5 @@ TODO
 update_beancounter
 t/01base.t
 contrib/getDiv
+contrib/schnapp
 META.yml                                 Module meta-data (added by MakeMaker)

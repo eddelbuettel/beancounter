@@ -42,7 +42,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.7.6'
+VERSION='0.8.0'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'

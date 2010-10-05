@@ -62,6 +62,7 @@
  addstock arg ...          add stock(s) with symbol arg to the database
  advancement               report on unrealized gains from lows
  backpopulate  arg ...     fill with historic data for given stock(s)
+ checkdbconnection         test if connection to db can be established
  dailyjob                  combines update, dayendreport, status + risk 
  dayendreport              reports p/l changes relative to previous day
  delete arg ...            delete given stock(s) from database
@@ -205,7 +206,7 @@ installed, as as long as the database backend is found.</p>
 brothers Bob and Bill (so that we can illustrate the 'owner' column).
 The prices below are completely fictitious, as are the portfolios.</p>
 <p>We suppose that <strong>beancounter</strong> is installed and that the
-'setup_beancounter' command has been run. We can then create a
+<strong>setup_beancounter</strong> command has been run. We can then create a
 two-stock (computer hardware) portfolio for Bob as follows:</p>
 <pre>
  beancounter addportfolio SUNW:100:USD:401k:bob:85.50:19991117 \
@@ -329,6 +330,9 @@ given day. No output is generated making the command suitable for
 <strong>status</strong> and <strong>risk</strong>.</p>
 <p><strong>delete</strong> removes the given symbols from the database.</p>
 <p><strong>destroydb</strong> deletes the BeanCounter database.</p>
+<p><strong>checkdbconnection</strong> simply opens and closes the database handle, and
+returns a specified exit code which can then be tested. This is used
+in the <strong>setup_beancounter</strong> command.</p>
 <p><strong>warranty</strong> display a short GNU General Public License statement.</p>
 <p>
 </p>
@@ -415,7 +419,7 @@ connection via the DBI-Pg driver in case DBI-ODBC is not used)</a></strong><br /
 <dt><strong><a name="item_user_to_specify_the_userid_for_the_database_connec"><em>user</em> to specify the userid for the database connection; if
 needed. If not specified, the current user id is used.</a></strong><br />
 </dt>
-<dt><strong><a name="item_password_to_specify_the_password_for_the_database_"><em>password</em> to specify the password for the database connection,
+<dt><strong><a name="item_passwd_to_specify_the_password_for_the_database_co"><em>passwd</em> to specify the password for the database connection,
 if needed.</a></strong><br />
 </dt>
 <dt><strong><a name="item_dbsystem_to_select_a_database_backend_2c_e_2eg_2e_"><em>dbsystem</em> to select a database backend, e.g. to switch from
@@ -518,12 +522,13 @@ its predecessors have been used by the author since the end of 1998.</p>
 <hr />
 <h1><a name="see_also">SEE ALSO</a></h1>
 <p><em>Finance::BeanCounter.3pm</em>, <em>smtm.1</em>, <em>Finance::YahooQuote.3pm</em>,
-<em>LWP.3pm</em>, <em>Date::Manip.3pm</em>, <em>Statistics::Descriptive.3pm</em></p>
+<em>LWP.3pm</em>, <em>Date::Manip.3pm</em>, <em>Statistics::Descriptive.3pm</em>,
+<em>setup_beancounter.1</em>, <em>update_beancounter.1</em>,</p>
 <p>
 </p>
 <hr />
 <h1><a name="copyright">COPYRIGHT</a></h1>
-<p>beancounter is (c) 2000, 2001, 2002 by Dirk Eddelbuettel &lt;<a href="mailto:edd@debian.org">edd@debian.org</a>&gt;</p>
+<p>beancounter is (c) 2000 - 2004 by Dirk Eddelbuettel &lt;<a href="mailto:edd@debian.org">edd@debian.org</a>&gt;</p>
 <p>Updates to this program might appear at 
 <em><a href="http://dirk.eddelbuettel.com/code/beancounter.html">http://dirk.eddelbuettel.com/code/beancounter.html</a></em>.</p>
 <p>This program is free software; you can redistribute it and/or modify

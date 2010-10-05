@@ -1,3 +1,62 @@
+beancounter (0.8.0) unstable; urgency=low
+
+  * New release with the following new features:
+  
+    o new command-line options for beancounter:
+        --commit           whether data update is written to DB, 
+        --equityupdate     whether equity data should be updated
+        --pacificfx        whether redundant FX source should be used
+      with defaults of 'yes', 'yes' and 'no', respetively
+  
+    o new beancounter command 'lsportfolio' to list current portfolio
+
+    o new beancounter command 'deactivate' to set arguments to inactive
+
+    o beancounter.spec: Updated with patch provided by R P Herrold 
+ 
+    o contrib/schnapp: Added contributed script by Mathias Weidner
+  
+  * Detailed changes
+  
+    o Several of the changes below are due to patches and/or suggestions
+      by Robert A. Schmied and Mathias Weidner.
+
+    o [beancounter] Checks that --date and --prevdate arguments
+      are valid dates (using the Date::Manip parser)
+
+    o [beancounter] Support new command-line argument and options; added
+      --help info as well as perldoc documentation
+  
+    o [beancounter] New function lsportfolio for eponymous command
+  
+    o [beancounter] New function inactive_portfolio for 'deactivate'
+
+    o [beancounter] Output tables slightly reformatted and aligned
+  
+    o [BeanCounter.pm] New functions GetUBCFXData, GetUBCFXHash, 
+      UpdateFXviaPacific implementing the redundant FX data sourcing
+  
+    o [BeanCounter.pm] Automatically reflect split-adjusted data in backpop
+    
+    o [BeanCounter.pm] Updated GetConfig function for new options
+  
+    o [BeanCounter.pm] Improved SQL logic in GetCashData function 
+  
+    o [BeanCounter.pm] Improved GetFXData to find most current data
+      before or equal to request date to deal better with non-biz days
+  
+    o [BeanCounter.pm] Support --commit argument to database updates
+  
+    o [BeanCounter.pm] Added check for data in DatabaseInfoData(); added
+      function ExistsInfoSymbol to implement the lookup
+
+    o [BeanCounter.pm] Added simple FX retrieval heuristic (employing the
+      ISO symbol) in ScrubDailyData()
+  
+    o [debian/control] Also 'OR'ed Depends on libdbd-sqlite-perl and sqlite
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Mon, 21 Mar 2005 22:24:31 -0600
+
 beancounter (0.7.6) unstable; urgency=low
 
   *  Bug fix release 

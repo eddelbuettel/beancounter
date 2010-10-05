@@ -1,12 +1,20 @@
+
+%define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
+%define perl_vendorarch %(eval "`perl -V:installvendorarch`"; echo $installvendorarch)
+
 Summary:     BeanCounter portfolio performance toolkit
 Name:        beancounter
-Version:     0.4.0
+Version:     0.7.6
 Release:     1
-Source:      beancounter_0.4.0.tar.gz
 Copyright:   GNU GPL
 Group:       Applications/Finance
 BuildRoot:   /var/tmp/build-rpm
-#Requires:    
+URL:	     http://dirk.eddelbuettel.com/code/beancounter.html
+
+Source:      http://dirk.eddelbuettel.com/code/beancounter/beancounter_%{version}.tar.gz
+
+Requires:    perl-Statistics-Descriptive
+
 %description
 Ever wondered what happened to your portfolio on a day the market
 moved 500 points? Ever wondered what your portfolio returned over the
@@ -34,9 +42,12 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT
 
 %build
-
-perl Makefile.PL
-make
+# perl Makefile.PL
+CFLAGS="%{optflags}" %{__perl} Makefile.PL \
+	PREFIX="%{buildroot}%{_prefix}" \
+	INSTALLDIRS="vendor"
+# make
+%{__make} %{?_smp_mflags}
 
 %install
 
@@ -47,6 +58,14 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root)
-%doc README THANKS TODO example.beancounterrc beancounter.html
-/usr/man/man1/*
+%doc README THANKS TODO example.beancounterrc beancounter.html 
+%doc *txt contrib/*
 /usr/bin/*
+%doc %{_mandir}/man*/*
+%{perl_vendorlib}/*
+
+%changelog
+* Tue Dec 28 2004 R P Herrold <info@owlriver.com> 0.7.6-1orc
+- rework a .spec file dateing from 0.4.0 to a proper one, which will build 
+ as non-root, and properly cascade version information with a minimal edit
+

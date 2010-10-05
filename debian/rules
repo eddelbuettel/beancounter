@@ -110,12 +110,14 @@ binary-indep: build
         #$(MAKE) 		prefix=$(debtmp)/usr pure_install
 	$(MAKE) 		install PREFIX=$(debtmp)/usr
 	dh_perl	
-	dh_installdocs		THANKS TODO README README.Debian README.non-gnu
+	dh_installdocs		THANKS TODO README README.Debian \
+				README.non-gnu
 	dh_installexamples	example.beancounterrc flip_symbol.sh 	\
 				beancounter_example.txt 		\
 				beancounter_schema_postgresql.txt 	\
 				beancounter_schema_sqlite.txt	 	\
-				beancounter_schema_mysql.txt 		
+				beancounter_schema_mysql.txt 		\
+				contrib/
         #dh_installmenu
         #dh_installinit
         #dh_installcron
