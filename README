@@ -8,7 +8,8 @@
    500 points?  Ever wondered what your portfolio returned over the last
    (odd) period?  Ever wondered if there was a simple cron job to report
    portfolio changes on a daily basis?  Ever wondered if you could database
-   the (public) price, volume, ... info for further analysis?
+   the (public) price, volume, ... info on dozens of stocks for further 
+   analysis?
 
    BeanCounter does all this, and provides a convenient command-line tool as
    well as a Perl library that can be used by other applications.
@@ -19,20 +20,20 @@
    welcome. US mutual funds are supported, as are foreign exchange rates and
    some precious metals.
 
-   This is still somewhat rough code in the sense that the command-line
-   options and function interfaces might change. The (initial) release number
-   is kept low intenionally. However, similar code has been working here
-   since the fall of 1998. This is an attempt in cleaning it all up, and
-   hopefully documenting it enough so that others can get started.
+   This is still somewhat beta in the sense that the command-line options and
+   function interfaces might change. The (initial) release number is kept low
+   intenionally. However, similar code has been working here since the fall
+   of 1998. 
 
 
 2. How to get started
 
-   You need Perl and PostgreSQL. Plus a host of Perl modules such as DBI
-   (Database independent interface) with either the DBD ODBC or the DBD
-   Postgres driver (i.e. DBD-Pg), LWP networking as well as Date::Manip.  All
-   of this is readily available for Debian; or else in source code at
-   www.postgresql.org and www.cpan.org.
+   You need Perl and PostgreSQL, or MySQL (as of version 0.4.0). Plus a host
+   of Perl modules such as DBI (Database independent interface) with either
+   the DBD ODBC or the DBD Postgres driver (i.e. DBD-Pg) or the DBD Mysql 
+   driver, LWP networking as well as Date::Manip and Statistics::Descriptive.
+   All of this is readily available for Debian; or else in source code at
+   www.postgresql.org and www.cpan.org. 
 
    Upon opening the .tar.gz archive, run 
 
@@ -45,12 +46,12 @@
 
    for a quick check.
 
-   Run 'setup_beancounter' to create the new PostgreSQL database and tables,
-   and to have them filled with example data. This even runs a first
-   portfolio report on the (example) portfolio. The 'setup_beancounter'
-   script has a few sanity checks to ensure that Postgres is running, that
-   the current user is a valid Postgres user, that it is not called by root,
-   and that the database hasn't already been created.
+   Run 'setup_beancounter' to create the new database and tables, and to have
+   them filled with example data. This even runs a first portfolio report on
+   the (example) portfolio. The 'setup_beancounter' script has a few sanity
+   checks to ensure that Postgres (or MySQL) is running, that the current
+   user is a valid database user, that it is not called by root, and that the
+   database hasn't already been created. 
 
 
 3. How to use it
@@ -123,6 +124,8 @@
    More error checking. More performance analytics. More markets. More
    documentation. Maybe a GUI.
 
+   See the TODO file.
+
 
 6. Disclaimer (taken straight from the GPL)
 
@@ -157,4 +160,4 @@
 
 Dirk Eddelbuettel <edd@debian.org>
 
-$Id: README,v 1.5 2001/02/10 19:36:50 edd Exp $
+$Id: README,v 1.6 2001/10/12 01:47:53 edd Exp edd $

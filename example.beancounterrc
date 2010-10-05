@@ -1,5 +1,5 @@
 #
-#  example file for ~/.beancounterrc
+#  example resource file ~/.beancounterrc for BeanCounter
 #
  
 #
@@ -27,6 +27,7 @@
 #  the key must be a symbol used and recognised by the global hash
 #  %Config; some command-line arguments are also recognized.  See 
 #  the GetConfig() function in BeanCounter.pm for the gory details.
+#
  
 #  Set the host on which the beancounter db is stored 
 host=localhost
@@ -39,17 +40,20 @@ host=localhost
 #  grants eg access locally. Hence defaults to 'undef'.
 #password=joesecret
 
-#  Declare that we want to connect using ODBC rather than via
-#  the Perl DBD driver for Postgres. See beancounter(1) for an
+#  Declare that we want to connect using ODBC rather than via the
+#  Perl DBD driver for PostgreSQL or MySQL. See beancounter(1) for an
 #  example ODBC configuration file, and the libiodbc documentation.
-#  Default is 0, i.e. DBD-PG.
+#  Default is 0, i.e. DBD-Pg or DBD-mysql.
 #odbc=1
+
+#  ODBC datasource name, defaults to beancounter
+#dsn=beancounter
 
 #  Set the default domestic currency. Default is USD  (yes, I moved :)
 #currency=CAD
 
 #  Example of setting a firewall proxy host, and user:password
-#proxy=1.2.3.4:80
+#proxy=http://1.2.3.4:80
 #firewall=joeuser:joepasswd
 
 #  Debugging
@@ -57,3 +61,12 @@ host=localhost
 
 #  Verbose operation
 #verbose=0
+
+#  Database system, eg to select MySQL over the default PostgreSQL
+#dbsystem=PostgreSQL
+
+#  Database name, eg to select something other than the default beancounter
+#dbname=beancounter
+
+#  Shall FX rates be updated?  Default is yes
+#fxupdate=1

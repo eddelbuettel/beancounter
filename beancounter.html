@@ -54,8 +54,8 @@
                            portfolio with optional 'type' and 'owner'
                            info, purchase price 'pp' and date 'pd'; 
                            see below for a complete example
- addstock arg ...          add stock(s) with symbol arg to the database
  allreports                combines dayendreport, status and risk 
+ addstock arg ...          add stock(s) with symbol arg to the database
  backpopulate  arg ...     fill with historic data for given stock(s)
  dailyjob                  combines update, dayendreport, status + risk 
  dayendreport              reports p/l changes relative to previous day
@@ -79,32 +79,39 @@
  --restriction sql         impose SQL restriction
  --extrafx fx1,fx2,...     additional currencies to load
  --forceupdate date        force db to store new price info with date
- --rcfile file             use different configuration file</PRE>
+ --rcfile file             use different configuration file
+ --[no]fxupdate            enforce/suppress FX update, default is update
+ --dbsystem system         use db backend system, default is PostgreSQL
+ --dbname name             use db name, default is beancounter</PRE>
 <P>
 <HR>
 <H1><A NAME="description">DESCRIPTION</A></H1>
-<P><STRONG>beancounter</STRONG> analyses stock market data to evaluate portfolio
-performance.  It has several modes of operation. The first main mode
-is data gathering: both current data (e.g. end-of-day closing prices)
-and historical price data (to back-populate the database) can be
-automatically retrieved and stored in a relational database (which is
-developed on PostgreSQL but should be easily portable to other
-database systems thanks to the Perl DBI layer). The second main mode
-is data analysis where the stored data is evaluated to provide
-performance information.</P>
-<P>Data is retrieved from the Yahoo! Finance web sites with support for
-North America (i.e. US and Canada), Europe (for the Continent as well
-as Great Britain), several Asian stock markets, Australia and New
+<P><STRONG>beancounter</STRONG> gathers and analyses stock market data to evaluate
+portfolio performance.  It has several modes of operation. The first
+main mode is data gathering: both current data (e.g. end-of-day
+closing prices) and historical price data (to back-populate the
+database) can be retrieved both automatically and efficiently with
+subsequent local storage in a relational database system (either
+<EM>PostgreSQL</EM> or <EM>MySQL</EM> though any other system with an <EM>ODBC</EM>
+driver could be used). The second main mode is data analysis where the
+stored data is evaluated to provide performance information. Several
+canned reports types are already available.</P>
+<P>Data is retrieved very efficiently in a single batch query per Yahoo!
+host from the Yahoo! Finance web sites. Support exists for North
+America (i.e. US and Canada), Europe (i.e. the Continent as well as
+Great Britain), several Asian stock markets, Australia and New
 Zealand. New markets are easy to add by following the (fairly
-extensively commented) Perl code. Patches are welcome!</P>
+extensively commented) Perl code. Patches are certainly welcome for
+further markets especially in Asia and Latin America!</P>
 <P><STRONG>beancounter</STRONG> can aggregate the change in value for the entire
-portfolio over arbitrary time horizons. Using the powerful
-date-parsing routine available to Perl, you can simply say 'from six
-months ago to today' (see below for examples).</P>
+portfolio over arbitrary time horizons (provided historical data has
+either been gathered or has been backpopulated). Using the powerful
+date-parsing routine available to Perl (thanks to the <EM>Date::Manip</EM>
+modules), you can simply say 'from six months ago to today' (see below
+for examples).</P>
 <P><STRONG>beancounter</STRONG> has been written and tested under Linux. It should run
 under any standard Unix as long as the required Perl modules are
-installed, as as long as the DB (currently only tested with
-PostgreSQL) is found.</P>
+installed, as as long as the database backend is found.</P>
 <P>
 <HR>
 <H1><A NAME="examples">EXAMPLES</A></H1>
@@ -114,11 +121,13 @@ PostgreSQL) is found.</P>
     This updates the database: it extends timeseries data (such as
     open, low, high, close, volume) with data for the current day,
     and overwrites static data (such as capital, price/earnings, ...) 
-    with current data. All stocks held in the portfolio are updated
+    with current data. All stocks held in the database are updated
     (unless the --restriction argument instructs otherwise). The 
     --forceupdate option lets the program corrects incorrect dates 
     returned from Yahoo! (which happens every now and so often), but
-    be careful to correct for this on public holidays.</PRE>
+    be careful to correct for this on public holidays. Note that 
+    the --restriction argument will be applied to the portfolio table,
+    whereas the overall selection comes from the stockinfo table.</PRE>
 <PRE>
  beancounter addportfolio SUNW:100:USD:joe:401k:85.50:19991117 \
                           IBM:100:USD:joe:401k:90.25:20000320  \
@@ -126,7 +135,8 @@ PostgreSQL) is found.</P>
 <PRE>
     This adds the two stocks Sun and IBM to the 401k portfolio of Joe,
     as well as SP500 'Spiders' to his IRA portfolio. The stocks are
-    also added to the general stock info tables.</PRE>
+    also added to the general stock info tables via an implicit call
+    of the stockinfo command.</PRE>
 <PRE>
  beancounter addstock LNUX RHAT COR.TO</PRE>
 <PRE>
@@ -137,10 +147,9 @@ PostgreSQL) is found.</P>
                           --date 'friday 1 week ago' IBM SUNW HWP</PRE>
 <PRE>
     This backpopulates the database with historic prices for three
-    hardware companies. Note how the date specification is very general.
-</PRE>
+    hardware companies. Note how the date specification is very general
+    thanks to the underlying Date::Manip module.</PRE>
 <PRE>
-
  beancounter plreport --prevdate '1 month ago' --date 'today' \
                         --restriction &quot;owner='joe'&quot;</PRE>
 <PRE>
@@ -204,6 +213,9 @@ day:</P>
 <P>or the status of holdings and their respective values:</P>
 <PRE>
  beancounter dayendreport --restriction &quot;owner='bill'&quot;</PRE>
+<P>Similarly, a risk reports can be run on this portfolios per</P>
+<PRE>
+ beancounter risk --restriction &quot;owner='bill'&quot;</PRE>
 <P>
 <HR>
 <H1><A NAME="more detailed command description">MORE DETAILED COMMAND DESCRIPTION</A></H1>
@@ -312,6 +324,13 @@ the weekend. A somewhat smarter comparison to previously stored data
 might prevent that, but would be more complex to implement.</P>
 <P><STRONG>--rcfile</STRONG> allows to specify a resource file different from the
 default <EM>~/.beancounterrc</EM>.</P>
+<P><STRONG>--dbsystem</STRONG> allows to switch to a different database backend. The 
+default is <STRONG>PostgreSQL</STRONG> but <STRONG>MySQL</STRONG> is also supported.</P>
+<P><STRONG>--dbsystem</STRONG> allows to switch to an alternate database. The default
+is 'beancounter'. This can be useful for testing new features.</P>
+<P><STRONG>--fxupdate</STRONG> is a boolean switch to enforece updates of FX rates during
+'update'. The default is 'true' but '--nofxupdate' can be used to suppress
+the update of foreign exchange rates.</P>
 <P>The <STRONG>--verbose</STRONG> and <STRONG>--debug</STRONG> switches can be used in debugging an
 testing, and <STRONG>--help</STRONG> triggers the display of help message.</P>
 <P>
@@ -321,17 +340,19 @@ testing, and <STRONG>--help</STRONG> triggers the display of help message.</P>
 options.</P>
 <P>
 <H2><A NAME="database requirements">DATABASE REQUIREMENTS</A></H2>
-<P><STRONG>beancounter</STRONG> currently depends of PostgreSQL. Another DB backend
-could be used, provided suitable Perl DBI drivers are available. The
-<STRONG>setup_beancounter</STRONG> script initializes the database, creates the
-required tables and fills them with some example data. It is a
-starting point for local modifications.</P>
-<P>The connection to the database is made via a dedicated function in
-the <STRONG>BeanCounter.pm</STRONG> module, changes would only have to be made
-there.  As of this writing the <STRONG>Perl DBI</STRONG> (the database-independent
-interface for Perl) is used along the DBI driver for PostgreSQL; an
-extension is planned for the DBI ODBC driver. Ports for MySQL,
-Oracle, ... are encouraged.</P>
+<P><STRONG>beancounter</STRONG> currently depends on either PostgreSQL or MySQL, or any
+other database for which an ODBC driver is available (though the
+required tables would have to created manually in the ODBC case). Yet
+another DB backend could be added provided suitable Perl DBI drivers
+are available. For PostgreSQL and MySQL, the <STRONG>setup_beancounter</STRONG>
+script can create and initialize the database, form the required
+tables and fills them with some example data. It is a starting point
+for local modifications.</P>
+<P>The connection to the database is made via a dedicated function in the
+<STRONG>BeanCounter.pm</STRONG> module, changes would only have to be made there.
+As of this writing the <STRONG>Perl DBI</STRONG> (the database-independent interface
+for Perl) is used along the DBI drivers for PostgreSQL, MySQL and
+ODBC. Ports for MySQL, Oracle, ... are encouraged.</P>
 <P>
 <H2><A NAME="config file">CONFIG FILE</A></H2>
 <P>A configuration file <EM>~/.beancounterrc</EM> is read if found. It
@@ -340,18 +361,31 @@ currently supports the following options:</P>
 <DT><STRONG><A NAME="item_currency_to_specify_into_which_home_currency_holdi"><EM>currency</EM> to specify into which home currency holdings and
 profits/losses have to be converted</A></STRONG><BR>
 <DD>
-<DT><STRONG><A NAME="item_user_to_specify_the_userid_for_the_DB_connection"><EM>user</EM> to specify the userid for the DB connection</A></STRONG><BR>
-<DD>
-<DT><STRONG><A NAME="item_firewall_to_specify_a_firewallid%3Afirewallpasswd_"><EM>firewall</EM> to specify a firewallid:firewallpasswd combination</A></STRONG><BR>
-<DD>
-<DT><STRONG><A NAME="item_proxy_to_specify_the_address_of_a_proxy_server"><EM>proxy</EM> to specify the address of a proxy server</A></STRONG><BR>
-<DD>
-<DT><STRONG><A NAME="item_on"><EM>odbc</EM> is a switch to turn ODBC connection on (default) or off
-in which case the DBI PostgreSQL driver is used</A></STRONG><BR>
-<DD>
 <DT><STRONG><A NAME="item_resides"><EM>host</EM> to specify the database server on which the
 <STRONG>BeanCounter</STRONG> database resides (this is needed only for the alternate
 connection via the DBI-Pg driver in case DBI-ODBC is not used)</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_user_to_specify_the_userid_for_the_database_connec"><EM>user</EM> to specify the userid for the database connection; if
+needed. If not specified, the current user id is used.</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_password_to_specify_the_password_for_the_database_"><EM>password</EM> to specify the password for the database connection,
+if needed.</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_dbsystem_to_select_a_database_backend%2C_e%2Eg%2E_"><EM>dbsystem</EM> to select a database backend, e.g. to switch from
+PostgreSQL to MySQL</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_dbsystem_to_select_a_different_default_database_na"><EM>dbsystem</EM> to select a different default database name other
+than the default of 'beancounter'</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_proxy_to_specify_the_address_of_a_firewall_proxy_s"><EM>proxy</EM> to specify the address of a firewall proxy server if
+one is needed to connect to the Internet.</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_firewall_to_specify_a_firewallid%3Afirewallpasswd_"><EM>firewall</EM> to specify a firewallid:firewallpasswd combination,
+if needed.</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_odbc_is_a_switch_to_turn_ODBC_connection_on_or_off"><EM>odbc</EM> is a switch to turn ODBC connection on or off</A></STRONG><BR>
+<DD>
+<DT><STRONG><A NAME="item_dsn_to_use_a_different_data_source_name_when_ODBC_"><EM>dsn</EM> to use a different data source name when ODBC is used</A></STRONG><BR>
 <DD>
 An example file <EM>example.beancounterrc</EM> should have come with the 
 sources (or the Debian package); please consult this file for more
@@ -359,8 +393,9 @@ examples.
 <P></P></DL>
 <P>
 <H2><A NAME="odbc configuration">ODBC CONFIGURATION</A></H2>
-<P>There are now several ODBC systems for Linux / Unix. The following
-<EM>~/.odbc.ini</EM> work with the <STRONG>iODBC</STRONG> library on my Debian GNU/Linux system:</P>
+<P>There are now several ODBC systems available for Linux / Unix. The
+following <EM>~/.odbc.ini</EM> work with the <STRONG>iODBC</STRONG> library and the
+<STRONG>PostgreSQL</STRONG> ODBC driver on my Debian GNU/Linux system:</P>
 <PRE>
    [ODBC Data Sources]
    beancounter = BeanCounter Database</PRE>
@@ -380,9 +415,6 @@ ODBC libraries.</P>
 <P><STRONG>Finance::BeanCounter</STRONG> and <STRONG>beancounter</STRONG> are so fresh that there are
 only missing features :) Seriously, check the TODO list. This code or
 its predecessors have been used by the author since the end of 1998.</P>
-<P>There might be issues with Perl 5.6 and PostgreSQL 7.* which have yet
-to be installed on the machines the author is running <STRONG>beancounter</STRONG>
-on.</P>
 <P>
 <HR>
 <H1><A NAME="see also">SEE ALSO</A></H1>

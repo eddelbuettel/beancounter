@@ -1,22 +1,95 @@
+beancounter (0.4.0) unstable; urgency=low
+
+  * New release with the following new features
+
+    - Support for MySQL has been added: beancounter can now work with both
+      PostgreSQL and MySQL, including all steps up from the database creation
+
+    - The update command's SQL query has been rewritten so that all stocks
+      known to beancounter are updated, yet still allows the use of the
+      --restriction option to specify only subsets of the portfolio
+
+    - The update command is now idempotent: it can now be run several
+      times during a trading day; the initial data set will be 'insert'ed,
+      following ones 'update'd (this comes at the cost of an additional query)
+
+    - Better support of old, expired or delisted stocks: unparseable
+      dates, as well as dates that "too old" (where the current default 5
+      business days) are set to N/A; and dates which test for N/A are neither
+      scrubbed nor databased during the "update" command.
+  
+    - Database backend and database name can now be set as parameters which
+      facilitates multiple databases and backends to be used in parallel
+  
+    - New (boolean) option --fxupdate which defauls to 'true', hence the
+      use of --nofxupdate prevents any updates to the FX database
+
+    - Database scheme change in stockprices table: column names changed to
+      day_open, day_close, day_change for consistency (and MySQL gripes).
+      Similarly, index becomes stockindex in the indices table. Hence, 
+      users /upgrading from an older version/ must run update_beancounter.
+  
+  * Detailed changes:
+
+    - [BeanCounter.pm] --verbose and --debug now passed to DBI connection
+      for Warn and PrintError, respectively 
+
+    - [BeanCounter.pm] New configuration options dbsystem and dbname,
+      defaulting to PostgreSQL and beancounter
+
+    - [BeanCounter.pm] Protect name with dbh->quote for DatabaseInfoData
+
+    - [BeanCounter.pm] DatabaseUpdate has new SQL query with sub-select
+
+    - [BeanCounter.pm] Several small code cleanups and documentation updates
+  
+    - [beancounter] New command-line options --dbsystem and --dbname
+  
+    - [beancounter] Several updates and extensions to the pod documentation
+
+    - [setup_beancounter] Now with command-line options -m, -s dbname, -s
+
+    - [setup_beancounter] Parallel code for MySQL db creations added
+
+    - [setup_beancounter] Added manual page as POD document within
+
+    - [update_beancounter] Added code for the database table transition
+
+    - [update_beancounter] Added manual page as POD document within
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Sun, 14 Oct 2001 20:57:05 -0500
+
 beancounter (0.3.1) unstable; urgency=low
 
   * Bug fix release:
+
     - rewrote SQL queries using '--restriction arg' to allow for multiple
       portfolio restrictions to be imposed (BeanCounter.pm)
+
     - reflect change at Yahoo! Europe and convert quotes from ';' field
       seperator and ',' decimal point (BeanCounter.pm: GetQuote)
+
     - ensure that day_end_report is relative to previous day (beancounter)
+
     - add dbh->commit() after database updates (beancounter: add_index,
       add_portfolio; BeanCounter.pm: delete_stock)
+
   * Some other minor changes:
+
     - annualise returns if stock held > 1 year (beancounter: display_status)
+
     - make some functions more compact with selectcol_arrayref (BeanCounter.pm)
+
     - use dropdb(1) to delete database (requires PostgreSQL 7.*) (beancounter)
+
     - add warning if correlation non computable (BeanCounter.pm: GetRiskData)
+
     - add warning if date not parseable (BeanCounter: ParseDailyData)
+
     - add historica price retrieval for (US) mutual funds 
       (BeanCounter.pm: GetHistoricalData)
-    - if data inconsistent, adjust close to to previous_close plus change
+
+   - if data inconsistent, adjust close to to previous_close plus change
       (BeanCounter: SrubDailyData)
   
  -- Dirk Eddelbuettel <edd@debian.org>  Mon, 13 Aug 2001 21:53:18 -0500
@@ -24,21 +97,31 @@ beancounter (0.3.1) unstable; urgency=low
 beancounter (0.3.0) unstable; urgency=low
 
   * New release with the following code changes
+
     - new command "risk" for report with value-at-risk at (VaR) percentile
       estimates, using both the standard (parametric) approach as well as
       a nonparametric quantile estimate
       "risk" also computes marginal value-at-risk (slow for large portfolios)
       "risk" requires the Statistics::Descriptive modules
+
     - new option "--forceupdate <date>" to permit overriding of a faulty
       date supplied by Yahoo! Finance (which is becoming more common)
+
     - new command "allreports" for dayend, status and risk reports all in once
+
     - added status and risk reports to jobs ran by "dailyjob" command
+
     - new ScrubDailyData routine; currently only using the "--forceupdate
       date" check on the pricing date supplied by Yahoo!
+
     - prevdate defaults to "six months ago" (better default for risk report)
+
     - "status" also shows cash holding from table `cash' (preliminary feature)
+
     - improved internal logic for argument and option checking + db connection
+
     - improved report calculations, report display and documentation
+
     - documentation corrected (command is 'delete', not 'deletestock')
   
  -- Dirk Eddelbuettel <edd@debian.org>  Thu, 29 Mar 2001 19:18:54 -0600
@@ -46,9 +129,13 @@ beancounter (0.3.0) unstable; urgency=low
 beancounter (0.2.1) unstable; urgency=low
 
   * Bug fix release:
+
     - setup_beancounter: change last fromdate,todate to prevate,date
+
     - setup_beancounter: use NT, not NT.TO, to avoid FX in demo
+
     - beancounter: Use psql, not destroydb or dropdb, to delete db
+
     - debian/control: Also depend on libdbd-pg-perl (Closes: #85363)
 
  -- Dirk Eddelbuettel <edd@debian.org>  Fri,  9 Feb 2001 22:45:54 -0600
@@ -56,16 +143,24 @@ beancounter (0.2.1) unstable; urgency=low
 beancounter (0.2.0) unstable; urgency=low
 
   * New release with the following code changes
+
     - new table columns 'owner' and 'holder' for portfolio allow
       to differentiate between different accounts and users
+
     - SQL restrictions can be imposed for finer-grained analysis
+
     - new status command for portfolio return and holding overview
+
     - extrafx argument allows to specify additional currencies to
       be downloaded and stored by the 'update' command
+
     - date and prevdate default to today and yesterday
+
     - fromdate and todate options replaced by consistent use
       of prevdate and date
+
     - more documentation
+
     - data display layout changed
   
  -- Dirk Eddelbuettel <edd@debian.org>  Sat,  2 Dec 2000 17:27:48 -0600
@@ -73,8 +168,8 @@ beancounter (0.2.0) unstable; urgency=low
 beancounter (0.1.1) unstable; urgency=low
 
   * Bugfix release:
-  * BeanCounter.pm: corrected minor typo in DatabaseInfoData
-  * debian/rules: don't create beancounter.1 -- Makefile.PL does that too
+    - BeanCounter.pm: corrected minor typo in DatabaseInfoData
+    - debian/rules: don't create beancounter.1 -- Makefile.PL does that too
 
  -- Dirk Eddelbuettel <edd@debian.org>  Tue, 25 Jul 2000 22:47:40 -0400
 
@@ -84,6 +179,4 @@ beancounter (0.1.0) unstable; urgency=low
 
  -- Dirk Eddelbuettel <edd@debian.org>  Sun, 23 Jul 2000 22:14:17 -0400
 
-Local variables:
-mode: debian-changelog
-End:
+

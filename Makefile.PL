@@ -32,8 +32,10 @@ WriteMakefile(
 				     "HTML::Parser"     => 2.20,
 				     "Text::ParseWords" => 3.1,
 				     "Date::Manip"	=> 5.35,
-				     "DBI::DBD"		=> 10.7,
-				     "DBD::Pg"		=> 0.93,  # or DBD::ODBC
+				     "DBI"		=> 1.16,
+				     "DBD::Pg"		=> 0.93,
+				     ## "DBD::ODBC"	=> 0.28,
+				     ## "DBD::mysql"	=> 2.0416,
 				     "Statistics::Descriptive" => 2.4
 				   },      
 	      ($] >= 5.005 ?

@@ -7,7 +7,12 @@ Horst.Timmermann@t-online.de (Horst Timmermann)
 Adrian Johnson <asj@bigpond.net.au>
         for also spotting this, and a few more buglets leading to 0.2.1
 Evelyn Mitchell <efm@tummy.com>
-        for pointing out behaviour which required additional $dbh->commit() calls
+        for pointing out the need for additional $dbh->commit() calls
+Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
+	for initial MySQL patches, numerous design discussions + suggestions
+        and the patch to allow 'update' to either insert or update
+Max Bott <Max.Bott@affa.gov.au> 
+	for the bug report on quotes in company name's (DatabaseInfoData)      
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 

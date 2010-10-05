@@ -2,7 +2,7 @@
 #
 #   setup_beancounter --- Example usage of the beancounter tool
 #  
-#   Copyright (C) 2000  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 2000, 2001  Dirk Eddelbuettel <edd@debian.org>
 #  
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,17 +18,35 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.7 2001/04/19 03:40:10 edd Exp edd $
+#   $Id: setup_beancounter,v 1.14 2001/10/10 02:22:16 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
 #
-# For now it is PostgreSQL specific
+# This once started as being PostgreSQL specific
+#
+# MySQL patches by Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
 
 # -------------------------- 'global' variables
 
-# psql(1) arguments -- you could add host, port, user, ... here
-PSQL="psql -q -d beancounter"
+# make sure we get this beancounter first
+#echo "DEVELOPMENT VERSION"
+#export PATH=".:$PATH"
+#echo "Using local path: $PATH"
+
+progname=$(basename $0)
+
+if [ "$USER" = "" ]
+then
+    USER=$(whoami)
+fi
+
+DATABASE='beancounter'
+#DATABASE='testbean'
+#PASSWORD=
+DBSYSTEM='PostgreSQL'
+#DBSYSTEM='MySQL'
+SCHEMA_ONLY=0
 
 # Dow Jones Industrial Average 
 # see for example http://www.amex.com/indexshares/index_shares_diamonds_list.stm
@@ -40,6 +58,20 @@ DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HWP HD HON INTC IBM IP JNJ MCD MR
 # (NB that Canadian stocks need a .TO suffix, eg Air Canada becomes AC.TO)
 
 # --------------------------- shell functions below --------------------------
+function usage_and_exit()
+{
+    cat<<EOF
+Created (and fill) database tables for beancounter
+Usage: $progname [-m] [-n databasename] [-h] 
+Options:
+    -m		Use MySQL instead of PostgreSQL
+    -n SOMENAME Create database as SOMENAME instead of beancounter
+    -s		Schema only -- Do not fill the database
+    -h		Show this help
+EOF
+    exit 0
+}
+
 function execute()
 {
     echo -n "** Running:     "
@@ -49,70 +81,156 @@ function execute()
 }
 
 
-function create_tables()
+function create_mysql_tables()
 {
-    echo | $PSQL <<EOF 
+    echo | $DBCOMMAND $DATABASE <<EOF 
+
+    CREATE TABLE fxprices (
+	currency varchar(12) NOT NULL default '',
+	date date default NULL,
+	previous_close float default NULL,
+	day_open float default NULL,
+	day_low float default NULL,
+	day_high float default NULL,
+	day_close float default NULL,
+	day_change float default NULL,
+	UNIQUE KEY fxprices_pkey(currency,date)
+    ) TYPE=MyISAM;
+
+    CREATE TABLE indices (
+	symbol varchar(12) NOT NULL default '',
+	stockindex varchar(12) NOT NULL default ''
+    ) TYPE=MyISAM;
+
+    CREATE TABLE portfolio (
+	symbol varchar(16) NOT NULL default '',
+	shares float default NULL,
+	currency varchar(12) default NULL,
+	type varchar(16) default NULL,
+	owner varchar(16) default NULL,
+	cost float default NULL,
+	date date default NULL,
+	UNIQUE KEY portfolio_pkey(symbol,owner,date)
+    ) TYPE=MyISAM;
+
+    CREATE TABLE stockinfo (
+	symbol varchar(12) NOT NULL default '',
+	name varchar(64) NOT NULL default '',
+	exchange varchar(16) NOT NULL default '',
+	capitalisation float default NULL,
+	low_52weeks float default NULL,
+	high_52weeks float default NULL,
+	earnings float default NULL,
+	dividend float default NULL,
+	p_e_ratio float default NULL,
+	avg_volume int(11) default NULL,
+	PRIMARY KEY (symbol)
+    ) TYPE=MyISAM;
+
+    CREATE TABLE stockprices (
+	symbol varchar(12) NOT NULL default '',
+	date date default NULL,
+	previous_close float default NULL,
+	day_open float default NULL,
+	day_low float default NULL,
+	day_high float default NULL,
+	day_close float default NULL,
+	day_change float default NULL,
+	bid float default NULL,
+	ask float default NULL,
+	volume int(11) default NULL,
+	UNIQUE KEY stockprices_pkey(symbol,date)
+    ) TYPE=MyISAM;
+
+    create table cash (
+	name varchar(16) not null default '',
+	value float default null,
+	currency varchar(12) default null,
+	type varchar(12) default null,
+	owner varchar(16) default NULL,
+	cost float default NULL,
+	date date default NULL,
+	UNIQUE KEY cash_pkey(name,type,owner,date)
+    ) TYPE=MyISAM;
+    \q
+EOF
+}
+
+function create_postgres_tables()
+{
+    echo | $DBCOMMAND $DATABASE <<EOF 
 
 	create table stockinfo (
-	    symbol   		varchar(12) not null,
-	    name     		varchar(64) not null,
-	    exchange 		varchar(16) not null,
-	    capitalisation  	float4,
-	    low_52weeks		float4,
-	    high_52weeks	float4,
-	    earnings		float4,
-	    dividend		float4,
-	    p_e_ratio		float4,
-	    avg_volume		int4
+	    symbol   		varchar(12) not null default '',
+	    name     		varchar(64) not null default '',
+	    exchange 		varchar(16) not null default '',
+	    capitalisation  	float4 default null,
+	    low_52weeks		float4 default null,
+	    high_52weeks	float4 default null,
+	    earnings		float4 default null,
+	    dividend		float4 default null,
+	    p_e_ratio		float4 default null,
+	    avg_volume		int4 default null
 	);
 	create unique index stockinfo_pkey
 	    on stockinfo (symbol);
 
 	create table stockprices (
-	    symbol   		varchar(12) not null,
-	    date		date,
-	    previous_close	float4,
-	    day_open		float4,
-	    day_low		float4,
-	    day_high		float4,
-	    day_close		float4,
-	    change		float4,
-	    bid			float4,
-	    ask			float4,
-	    volume		int4
+	    symbol   		varchar(12) not null default '',
+	    date		date default null,
+	    previous_close	float4 default null,
+	    day_open		float4 default null,
+	    day_low		float4 default null,
+	    day_high		float4 default null,
+	    day_close		float4 default null,
+	    day_change		float4 default null,
+	    bid			float4 default null,
+	    ask			float4 default null,
+	    volume		int4 default null
 	);
 	create unique index stockprices_pkey
 	    on stockprices (symbol, date);
 
 	create table fxprices (
-	    currency   		varchar(12) not null,
-	    date		date,
-	    previous_close	float4,
-	    day_open		float4,
-	    day_low		float4,
-	    day_high		float4,
-	    day_close		float4,
-	    change		float4
+	    currency   		varchar(12) not null default '',
+	    date		date default null,
+	    previous_close	float4 default null,
+	    day_open		float4 default null,
+	    day_low		float4 default null,
+	    day_high		float4 default null,
+	    day_close		float4 default null,
+	    day_change		float4 default null
 	);
 	create unique index fxprices_pkey
 	    on fxprices (currency, date);
 
 	create table portfolio (
-	    symbol   		varchar(16) not null,
-	    shares		float4,
-	    currency		varchar(12),
-	    type		varchar(16),
-	    owner		varchar(16),
-	    cost		float(4),
-	    date		date
-	    
+	    symbol   		varchar(16) not null default '',
+	    shares		float4 default null,
+	    currency		varchar(12) default null,
+	    type		varchar(16) default null,
+	    owner		varchar(16) default null,
+	    cost		float(4) default null,
+	    date		date default null
 	);
 	create unique index portfolio_pkey
 	    on portfolio (symbol, owner, date);
 
+	create table cash (
+	    name 		varchar(16) not null default '',
+	    value 		float default null,
+	    currency 		varchar(12) default null,
+	    type 		varchar(12) default null,
+	    owner 		varchar(16) default NULL,
+	    cost 		float default NULL,
+	    date 		date default NULL
+	);
+	create unique index cash_pkey 
+	    on cash (name,type,owner,date);
+
 	create table indices (
-	    symbol   		varchar(12) not null,
-	    index		varchar(12) not null
+	    symbol   		varchar(12) not null default '',
+	    stockindex		varchar(12) not null default ''
 	);
 	\q
 EOF
@@ -121,17 +239,26 @@ EOF
 function exit_if_exists()
 {
     set +e
-    result=`psql template1 -l | grep beancounter`
+    if [ "$DBSYSTEM" = "MySQL" ]
+    then
+	result=`echo 'show databases'| $DBCOMMAND | grep $DATABASE`
+    else
+	result=`$DBCOMMAND template1 -l | grep $DATABASE`
+    fi
     set -e
     if [ "$result" != "" ]
     then
 	echo ""
 	echo "*** Error: Database exists ***"
 	echo ""
-	echo "The beancounter database already exists"
+	echo "The $DATABASE database already exists"
 	echo "This script is not needed to setup the database."
 	echo "You might still want to look at its source to write"
-	echo "your own script for populating the beancounter database."
+	echo "your own script for populating the $DATABASE database."
+	echo ""
+	echo "If you want to delete the exiting database, use"
+	echo "    dropdb $DATABASE       	for PostgreSQL"
+	echo "    mysqladmin drop $DATABASE	for MySQL"
 	echo ""
 	exit 1
     fi
@@ -145,7 +272,7 @@ function exit_if_root()
 	echo "*** Error: Root usage ***"
 	echo ""
 	echo "We do not recommend that you run this script as root"
-	echo "Please re-run it as a normal user to setup BeanCounter."
+	echo "Please re-run it as a normal user to setup $DATABASE."
 	echo "If you insist, then please uncomment this test first."
 	echo ""
 	exit 1
@@ -157,7 +284,8 @@ function exit_if_root()
 function exit_if_no_postgres_user()
 {
     set +e
-    ( psql template1 -q -c "select * from pg_user;" | grep -v $1 ) >/dev/null 2>&1 
+    ( $DBCOMMAND template1 -c "select * from pg_user;" | grep $1 ) \
+			    >/dev/null 2>&1 
     if [ $? -eq 1 ]
     then
 	echo ""
@@ -167,7 +295,7 @@ function exit_if_no_postgres_user()
 	echo "You need to create a Postgresql user '$1' first:"
 	echo ""
 	echo "    Change to user postgres:		$ su - postgres"
-	echo "    Create the user:       		# createuser $1 -d"
+	echo "    Create the user:       		# createuser $1 -d -A"
 	echo "    Exit from user postgres:		# exit"
 	echo ""
 	echo "and then run this script again."
@@ -179,50 +307,173 @@ function exit_if_no_postgres_user()
     set -e
 }
 
+function exit_if_no_mysql_user()
+{
+    set +e
+    ( echo "select user from user;" | \
+	    $DBCOMMAND mysql | grep $1 ) >/dev/null 2>&1 
+    if [ $? -eq 1 ]
+    then
+	echo ""
+	echo "*** Error: No mysql user '$1'"
+	echo ""
+	echo "We were unable to start mysql as the user '$1' does not exist"
+	echo "You need to create a MySQL user '$1' first:"
+	echo ""
+	echo "    Change to super user (MySQL Admin):   $ su -"
+	echo "    Start mysql program with mysql db:    # mysql mysql"
+	echo "    Create the user:       grant all privileges on *.* to $user@localhost;"
+	echo "    Exit from user mysql:                 > \q"
+	echo "    Exit from super user:                 # exit"
+	echo ""
+	echo "and then run this script again."
+	echo ""
+	echo "[ NB These instructions are currently approximative. Consult your manual. ]"
+	echo "[    And email me a better version :) ]"
+	exit 1
+#    else
+#	echo "Good: MySQL can be accessed by $1"
+    fi
+    set -e
+}
+  
+
 
 # ------------------------ 'main' code -------------------------------------
 
-if [ "$USER" == "" ]
-then
-    USER=$(whoami)
+while getopts ":mn:sh" opt
+do
+    case $opt in
+	m)
+	    DBSYSTEM='MySQL'
+	    echo "Now using $DBSYSTEM"
+	    ;;
+	n)
+	    DATABASE=$OPTARG
+	    echo "Now using database name $DATABASE"
+	    exit 1
+	    ;;
+	s)
+	    SCHEMA_ONLY=1
+	    ;;
+	h)
+	    usage_and_exit
+	    ;;
+	?)
+	    echo "Ignoring unknown argument, try '$progname -h' for help."
+	    ;;
+    esac
+done	    
+
+BEANCOUNTER="beancounter --dbsystem $DBSYSTEM --dbname $DATABASE"
+
+if [ "$DBSYSTEM" = "MySQL" ]; then
+    # mysql(1) arguments -- you could add host, port, ... here
+    if [ -z "$PASSWORD" ]; then
+	DBCOMMAND="mysql"
+    else
+	DBCOMMAND="mysql -p$PASSWORD"
+    fi
+else
+    if [ -z "$PASSWORD" ]; then
+	DBCOMMAND="psql -q"
+    else
+	DBCOMMAND="psql -q -W $PASSWORD"
+    fi
 fi
 
 # test if we are running this as root
 exit_if_root $USER
 
-# test if psql can be run by current user
-exit_if_no_postgres_user $USER
+# test if database can be accessed by user
+if [ "$DBSYSTEM" = "PostgreSQL" ]; then
+    exit_if_no_postgres_user $USER
+else
+    exit_if_no_mysql_user $USER
+fi
 
-# test if beancounter exists and exit if that's the case 
+# test if $DATABASE exists and exit if true
 exit_if_exists
 
-echo "Creating BeanCounter database"
-execute "createdb beancounter"
+echo "Creating $DATABASE database"
+if [ "$DBSYSTEM" = "PostgreSQL" ]; then
+    execute "createdb $DATABASE"
+else
+    echo "create database $DATABASE;" | $DBCOMMAND 
+# NB deleting db under MySQL is:  mysqladmin drop beancounter_test -p$PASSWORD
+# grant access to $DATABASE db
+#GRANT="grant select,delete,insert,update on $DATABASE.* to $USER@localhost"
+#echo $GRANT | $DBCOMMAND
+fi
+echo ""
 
-echo "Creating BeanCounter database tables"
-create_tables 
+echo "Creating $DATABASE database tables"
+if [ "$DBSYSTEM" = "PostgreSQL" ]; then
+    create_postgres_tables 
+else
+    create_mysql_tables 
+fi
+
+if [ "$SCHEMA_ONLY" -eq 1 ]; then
+    echo "Schema created, exiting"
+    exit 0
+fi
 
 # insert the DJIA stocks into the indices table
-echo "Filling BeanCounter database tables with DJIA stocks"
-execute "beancounter addindex DJIA $DJIA"
+echo "Filling $DATABASE database tables with DJIA stocks"
+execute "$BEANCOUNTER addindex DJIA $DJIA"
 
-# create an example of Dow stocks
-echo "Filling BeanCounter (sample) portfolio"
-execute "beancounter addportfolio CSCO:20:USD NT:20:USD"
+# create an example of two tech stocks
+echo "Filling $DATABASE (sample) portfolio"
+execute "$BEANCOUNTER addportfolio CSCO:20:USD NT:20:USD"
 
-echo -n "Filling BeanCounter with stock info and most recent prices "
+echo -n "Filling $DATABASE with stock info and most recent prices "
 echo "for DJIA stocks"
-execute "beancounter addstock $DJIA"
+execute "$BEANCOUNTER addstock $DJIA"
 
-echo "Filling BeanCounter with historical prices for DJIA stocks"
-execute "beancounter backpopulate --prevdate '1 year ago' --date 'friday 1 week ago' CSCO NT"
+echo "Filling $DATABASE with historical prices for example portfolio stocks"
+execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date 'friday 1 week ago' CSCO NT"
 
 echo "Running portfolio pl report on (sample) portfolio"
-execute "beancounter plreport"
+execute "$BEANCOUNTER plreport"
 
 echo "Running portfolio dayendreport on (sample) portfolio"
-execute "beancounter dayendreport"
+execute "$BEANCOUNTER dayendreport"
+
+echo "Running portfolio riskreport on (sample) portfolio"
+execute "$BEANCOUNTER risk"
 
 echo "Done."
 exit 0
 
+
+=head1 NAME
+
+setup_beancounter - Create and initialise BeanCounter databases
+
+=head1 SYNOPSIS
+
+setup_beancounter [-m] [-n NAME] [-n] [-h] 
+
+=head1 DESCRIPTION
+
+B<setup_beancounter> creates and initialises the databases used by 
+B<beancounter>. It also runs some initial reports to illustrate some 
+of the features of B<beancounter>.
+
+=head1 OPTIONS
+
+ -m       Use I<MySQL> as the backend over the default I<PostgreSQL>
+ -n name  Use I<name> as the database instead of I<beancounter>
+ -s       Do not fill the database, only create its schema
+ -h       Show a simple help message
+
+=head1 SEE ALSO
+
+B<beancounter>(1), B<BeanCounter>(1), B<update_beancounter>(1)
+
+=head1 AUTHOR
+
+Dirk Eddelbuettel <edd@debian.org>
+
+=cut

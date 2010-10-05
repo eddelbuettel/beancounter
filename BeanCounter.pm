@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.20 2001/08/17 01:46:22 edd Exp $
+#  $Id: BeanCounter.pm,v 1.33 2001/10/15 01:48:44 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -42,6 +42,8 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     DatabaseDailyData
 	     DatabaseHistoricalData
 	     DatabaseInfoData
+	     ExistsDailyData
+	     ExistsFXDailyData
 	     GetTodaysAndPreviousDates
 	     GetCashData
 	     GetConfig
@@ -63,7 +65,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.20 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.33 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -83,11 +85,23 @@ sub ConnectToDb {		# log us into the database (PostgreSQL)
   if ($Config{odbc}) {
     $dbh = DBI->connect("dbi:ODBC:$Config{dsn}",
 			$Config{user}, $Config{passwd}, 
-			{ PrintError => 0, Warn => 1, AutoCommit => 0 });
-  } else {
-    $dbh = DBI->connect("dbi:Pg:dbname=beancounter;host=$Config{host}", 
+			{ PrintError => $Config{debug}, 
+			  Warn => $Config{verbose}, 
+			  AutoCommit => 0 });
+  } elsif (lc $Config{dbsystem} eq "postgresql") {
+    $dbh = DBI->connect("dbi:Pg:dbname=$Config{dbname};host=$Config{host}",
 			$Config{user}, $Config{passwd},
-			{ PrintError => 0, Warn => 1, AutoCommit => 0 });
+			{ PrintError => $Config{debug}, 
+			  Warn => $Config{verbose}, 
+			  AutoCommit => 0 });
+  } elsif (lc $Config{dbsystem} eq "mysql") {
+    $dbh = DBI->connect("dbi:mysql:dbname=$Config{dbname};host=$Config{host}",
+			$Config{user}, $Config{passwd},
+			{ PrintError => $Config{debug}, 
+			  Warn => $Config{verbose}, 
+			  AutoCommit => 0 });
+  } else {
+    die "Database system $Config{dbsystem} is not supported";
   }
   die "No luck with database connection" unless ($dbh);
 
@@ -123,7 +137,8 @@ sub GetTodaysAndPreviousDates {
 
 
 sub GetConfig {
-  my ($file, $debug, $verbose, $fx, $extrafx, $updatedate, $command) = @_;
+  my ($file, $debug, $verbose, $fx, $extrafx, $updatedate,
+      $dbsystem, $dbname, $fxupdate, $command) = @_;
 
   %Config = ();			# reset hash
 
@@ -137,17 +152,27 @@ sub GetConfig {
   $Config{user} = $ENV{USER};	# default user is current user
   $Config{passwd} = undef;	# default password is no password
 
+  $Config{dbsystem} = "PostgreSQL";
+  $Config{dbname} = "beancounter";
+
   $Config{today} = strftime("%Y%m%d", localtime);
   ($Config{lastbizday}, $Config{prevbizday}) = GetTodaysAndPreviousDates;
 
   # DSN name for ODBC
   $Config{dsn} = "beancounter";	# default ODBC data source name
 
-  # host is needed only for the DBI-Pg interface
+  # host is needed only for the DBI-Pg or DBI-mysql interface
   $Config{host} = "localhost";	# default to local machine
 
+  # default to updating FX
+  if ($fxupdate) { 
+    $Config{fxupdate} = 1;
+  } else {
+    $Config{fxupdate} = 0;
+  }
+
   unless ( -f $file ) {
-    warn "Config file $file not found, ignored.";
+    warn "Config file $file not found, ignored.\n";
     return %Config;
   }
 
@@ -162,6 +187,10 @@ sub GetConfig {
   close(FILE);
 
   $Config{currency} = $fx if defined($fx);
+
+  $Config{dbname} = $dbname if defined($dbname);
+  $Config{dbsystem} = $dbsystem if defined($dbsystem);
+  $Config{odbc} = 1 if defined($dbsystem) and lc $dbsystem eq "odbc";
 
   if (defined($extrafx)) {
     unless ($command =~ /^(update|dailyjob)$/) {
@@ -200,7 +229,6 @@ sub GetCashData {
     $cash{$name}{value} += $value; # adds if there are several
     $cash{$name}{fx} = $fx;
     $cash{$name}{cost} = $cost;
-    $dbh->commit();		# the ODBC driver needs that for a weird reason
   }
   return(\%cash);
 }
@@ -358,7 +386,6 @@ sub GetPriceData {
   $stmt  = "select distinct symbol from portfolio ";
   $stmt .= "where $res " if (defined($res));
   $stmt .= "order by symbol";
-  $dbh->commit();		# sometime get DB error here if not reset
   @symbols = @{ $dbh->selectcol_arrayref($stmt) };
   # for each symbol, get most recent date subject to supplied date
   $stmt  = qq{select max(date) 
@@ -372,15 +399,15 @@ sub GetPriceData {
     $rv = $sth->execute($ra, $date); # run query for report end date
     my $res = $sth->fetchrow_array;
     $dates{$ra} = $res;
-    $dbh->commit();		# the ODBC driver needs that for a weird reason
+    $sth->finish() if $Config{odbc};
   }
 
   # now get closing price etc at date
-  $stmt =    qq{select i.symbol, i.name, p.shares, p.currency, 
+  $stmt =    qq{select i.symbol, i.name, p.shares, p.currency,
 		       d.day_close, p.cost, p.date, d.previous_close
-		from stockinfo i, portfolio p, stockprices d 
-		where d.symbol = p.symbol 
-		and i.symbol = d.symbol  
+		from stockinfo i, portfolio p, stockprices d
+		where d.symbol = p.symbol
+		and i.symbol = d.symbol
 		and d.date = ?
 		and d.symbol = ?
 	       };
@@ -390,11 +417,13 @@ sub GetPriceData {
   $sth = $dbh->prepare($stmt);
   my $i = 0;
   foreach $ra (@symbols) {		
-    $rv = $sth->execute($dates{$ra}, $ra); 
+    $rv = $sth->execute($dates{$ra}, $ra);
     while (($symbol, $name, $shares, $currency, $price, 
 	    $cost, $pdate, $prevprice) = $sth->fetchrow_array) {
-      print join " ", ($symbol, $name, $shares, $currency, $price, 
-		       $cost, $pdate, $prevprice), "\n" if $Config{debug};
+      print join " ", ($symbol, $name, $shares, 
+		       $currency, $price, 
+		       $cost||"NA", $pdate||"NA", 
+		       $prevprice||"NA"), "\n" if $Config{debug};
       $fx{$name} = $currency;	
       $prices{$name} = $price;
       $pricedate{$name} = $dates{$symbol};
@@ -406,7 +435,6 @@ sub GetPriceData {
       $shares{$name} = $shares;
     }
   }
-
   print Dumper(\%prices) if $Config{debug};
   print Dumper(\%prev_prices)  if $Config{debug};
   return (\%fx, \%prices, \%prev_prices, \%shares, \%pricedate, 
@@ -435,7 +463,6 @@ sub GetFXData {
       my $ary_ref = $sth->fetchall_arrayref;
     }
   }
-
   return (\%fx_prices, \%prev_fx_prices);
 }
 
@@ -569,6 +596,7 @@ sub GetRiskData {
     $rv = $sth->execute($ra->[0], $date); # run query for report end date
     my $res = $sth->fetchrow_array;
     $maxdate{$ra->[1]} = $res;
+    $sth->finish() if $Config{odbc};
   }
 
   # get position values
@@ -630,25 +658,46 @@ sub GetRiskData {
 
 sub DatabaseDailyData {		# a row to the dailydata table
   my ($dbh, %hash) = @_;
+  my $cmd;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     print "$hash{$key}{symbol} " if $Config{verbose};
 
-    my $cmd = "insert into stockprices values (" . 
-              "'$hash{$key}{symbol}'," . 
-	      "'$hash{$key}{date}'," .
-	      "$hash{$key}{previous_close}," .
-	      "$hash{$key}{open}," .
-	      "$hash{$key}{day_low}," .
-	      "$hash{$key}{day_high}," .
-	      "$hash{$key}{close}," .
-	      "$hash{$key}{change}," .
-	      "$hash{$key}{bid}," .
-	      "$hash{$key}{ask}," .
-	      "$hash{$key}{volume})";
+    if ($hash{$key}{date} eq "N/A") {
+      warn "Not databasing $hash{$key}{symbol}\n" if $Config{debug};
+      next;
+    }
+
+    if (ExistsDailyData($dbh, $key, %hash)) {
+      $cmd = "update stockprices set" .
+ 	     "  previous_close = $hash{$key}{previous_close}," .
+	     "  day_open       = $hash{$key}{day_open}," .
+	     "  day_low        = $hash{$key}{day_low}," .
+	     "  day_high       = $hash{$key}{day_high}," .
+	     "  day_close      = $hash{$key}{day_close}," .
+	     "  day_change     = $hash{$key}{day_change}," .
+	     "  bid            = $hash{$key}{bid}," .
+	     "  ask            = $hash{$key}{ask}," .
+	     "  volume         = $hash{$key}{volume} " .
+	     "where symbol     = '$hash{$key}{symbol}' " .
+	     "and date         = '$hash{$key}{date}'";
+    } else {
+      $cmd = "insert into stockprices values (" . 
+             "'$hash{$key}{symbol}'," . 
+	     "'$hash{$key}{date}'," .
+	     "$hash{$key}{previous_close}," .
+	     "$hash{$key}{day_open}," .
+	     "$hash{$key}{day_low}," .
+	     "$hash{$key}{day_high}," .
+	     "$hash{$key}{day_close}," .
+	     "$hash{$key}{day_change}," .
+	     "$hash{$key}{bid}," .
+	     "$hash{$key}{ask}," .
+	     "$hash{$key}{volume})";
+    }
     $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
     print "$cmd\n" if $Config{debug};
     print "$hash{$key}{symbol} " if $Config{verbose};
-    $dbh->do($cmd) or warn "\nFailed for $hash{$key}{symbol} with $cmd\n";
+    $dbh->do($cmd) or warn "Failed for $hash{$key}{symbol} with $cmd\n";
     $dbh->commit();
   }
 }
@@ -656,22 +705,46 @@ sub DatabaseDailyData {		# a row to the dailydata table
 
 sub DatabaseFXDailyData {
   my ($dbh, %hash) = @_;
-  my $stmt = qq{insert into fxprices values (?, ?, ?, ?, ?, ?, ?, ?);};
-  my $sth = $dbh->prepare($stmt);
   my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     my $fx = $yahoo2iso->{$hash{$key}{symbol}};
     print "$fx ($hash{$key}{symbol})  " if $Config{debug};
-    $sth->execute($fx, 
-		  $hash{$key}{date}, 
-		  $hash{$key}{previous_close},
-		  $hash{$key}{open},
-		  $hash{$key}{day_low},
-		  $hash{$key}{day_high},
-		  $hash{$key}{close},
-		  $hash{$key}{change}
-		 )
-      or warn "\nFailed for $fx at $hash{$key}{date}";
+    if (ExistsFXDailyData($dbh, $fx, $key, %hash)) {
+      # different sequence of parameters, see SQL statement above!
+      my $stmt = qq{update fxprices
+                    set previous_close = ?,
+                        day_open       = ?,
+                        day_low        = ?,
+                        day_high       = ?,
+                        day_close      = ?,
+                        day_change     = ?
+                 where currency        = ?
+                   and date            = ?
+                };
+      $dbh->do($stmt, undef, $hash{$key}{previous_close},
+	       $hash{$key}{day_open},
+	       $hash{$key}{day_low},
+	       $hash{$key}{day_high},
+	       $hash{$key}{day_close},
+	       $hash{$key}{day_change},
+	       $fx,
+	       $hash{$key}{date}
+	      )
+	or warn "Failed for $fx at $hash{$key}{date}\n";
+    } else {
+      my $stmt = qq{insert into fxprices values (?, ?, ?, ?, ?, ?, ?, ?);};
+      my $sth = $dbh->prepare($stmt);
+      $sth->execute($fx,
+		    $hash{$key}{date},
+		    $hash{$key}{previous_close},
+		    $hash{$key}{day_open},
+		    $hash{$key}{day_low},
+		    $hash{$key}{day_high},
+		    $hash{$key}{day_close},
+		    $hash{$key}{day_change}
+		   )
+	or warn "Failed for $fx at $hash{$key}{date}\n";
+    }
     $dbh->commit();
   }
 }
@@ -690,16 +763,19 @@ sub DatabaseHistoricalData {
       my ($date, $open, $high, $low, $close, $volume, $cmd);
       if ($checked eq 5) {	# indices have no volume
 	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
+	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
 	$cmd = "insert into stockprices " . 
          "(symbol, date, day_open, day_high, day_low, day_close, volume) " .
 	 "values ('$symbol', '$date', $open, $high, $low, $close, $volume);";
       } elsif ($checked eq 1) {	# only close for mutual funds
 	($date, $close) = split(/\,/, $ARG);
+	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
 	$cmd = "insert into stockprices " . 
 	  "(symbol, date, day_open, day_high, day_low, day_close, volume) " .
 	    "values ('$symbol', '$date', null, null, null, $close, null);";
       } else {			# no volume for indices
 	($date, $open, $high, $low, $close) = split(/\,/, $ARG);
+	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
 	$cmd = "insert into stockprices " . 
 	  "(symbol, date, day_open, day_high, day_low, day_close, volume) " .
 	    "values ('$symbol', '$date', $open, $high, $low, $close, null);";
@@ -721,7 +797,7 @@ sub DatabaseInfoData {		# update a row in the info table
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     my $cmd = "insert into stockinfo values (" . 
               "'$hash{$key}{symbol}'," .
-	      "'$hash{$key}{name}', " .
+	      $dbh->quote($hash{$key}{name}) . ", " .
 	      "'$hash{$key}{exchange}', " .
               "$hash{$key}{market_capitalisation}," .
               "$hash{$key}{'52_week_low'}," .
@@ -735,6 +811,43 @@ sub DatabaseInfoData {		# update a row in the info table
     print "$hash{$key}{symbol} " if $Config{verbose};
     $dbh->do($cmd) or die $dbh->errstr;
     $dbh->commit();
+  }
+}
+
+
+sub ExistsDailyData {
+  my ($dbh,$key,%hash) = @_;
+  my $stmt = qq{select previous_close, day_open, day_low, day_high,
+		       day_close, day_change, bid, ask, volume
+		from stockprices
+		where symbol = ?
+		and date     = ?
+	       };
+  if (@row = $dbh->selectrow_array($stmt, undef, $hash{$key}{symbol},
+				   $hash{$key}{date})) {
+    # plausibility tests here
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+
+sub ExistsFXDailyData {
+  my ($dbh,$fx,$key,%hash) = @_;
+  my $stmt = qq{select previous_close, day_open, day_low, day_high,
+                       day_close, day_change
+                from fxprices
+                where currency = ?
+                  and date     = ?
+              };
+  my $sth = $dbh->prepare($stmt);
+  $sth->execute($fx,$hash{$key}{date});
+  if (@row = $sth->fetchrow_array()) {
+    # plausibility tests here
+    return 1;
+  } else {
+    return 0;
   }
 }
 
@@ -803,18 +916,20 @@ sub ParseDailyData {		# stuff the output into the hash
     my $key = $ra->[0];
     $hash{$key}{symbol}         = $ra->[0];
     $hash{$key}{name}           = RemoveTrailingSpace($ra->[1]);
-    $hash{$key}{close}          = ParseNumeric($ra->[2]);
-    $hash{$key}{date}           = GetDate($ra->[3]);
-    warn "Unparseable date for $key\n" unless $hash{$key}{date};
+    $hash{$key}{day_close}      = ParseNumeric($ra->[2]);
+    unless ($hash{$key}{date} = GetDate($ra->[3])) {
+      $hash{$key}{date} = "N/A";
+      warn "Ignoring symbol $key with unparseable date\n";
+    }
     $hash{$key}{time}           = $ra->[4];
-    $hash{$key}{change}	  	= ParseNumeric($ra->[5]);
+    $hash{$key}{day_change}	= ParseNumeric($ra->[5]);
     $hash{$key}{percent_change} = $ra->[6];
     $hash{$key}{volume}         = $ra->[7];
     $hash{$key}{average_volume} = $ra->[8];
     $hash{$key}{bid}            = ParseNumeric($ra->[9]);
     $hash{$key}{ask}            = ParseNumeric($ra->[10]);
     $hash{$key}{previous_close} = ParseNumeric($ra->[11]);
-    $hash{$key}{open}           = ParseNumeric($ra->[12]);
+    $hash{$key}{day_open}       = ParseNumeric($ra->[12]);
     my (@tmp) = split / - /, $ra->[13];
     $hash{$key}{day_low}        = ParseNumeric($tmp[0]);
     $hash{$key}{day_high}       = ParseNumeric($tmp[1]);
@@ -876,11 +991,11 @@ sub ReportDailyData {		# detailed display / debugging routine
     printf "Date               %25s\n", $hash{$key}{date};
     printf "Time               %25s\n", $hash{$key}{time};
     printf "Previous Close     %25s\n", $hash{$key}{previous_close};
-    printf "Open               %25s\n", $hash{$key}{open};
+    printf "Open               %25s\n", $hash{$key}{day_open};
     printf "Day low            %25s\n", $hash{$key}{day_low};
     printf "Day high           %25s\n", $hash{$key}{day_high};
-    printf "Close              %25s\n", $hash{$key}{close};
-    printf "Change             %25s\n", $hash{$key}{change};
+    printf "Close              %25s\n", $hash{$key}{day_close};
+    printf "Change             %25s\n", $hash{$key}{day_change};
     printf "Percent Change     %25s\n", $hash{$key}{percent_change};
     printf "Bid                %25s\n", $hash{$key}{bid};
     printf "Ask                %25s\n", $hash{$key}{ask};
@@ -935,18 +1050,35 @@ sub ScrubDailyData {          # stuff the output into the hash
   ## on public holidays. We will have to find a way to filter this
   ##
   foreach my $key (keys %hash) {# now check the date
+
+    if ($hash{$key}{date} eq "N/A") {
+      warn "Not scrubbing $hash{$key}{symbol}\n" if $Config{debug};
+      next;
+    }
+
     if ($hash{$key}{date} ne $Config{today}) {   # if date is not today
+
+      my $age = Delta_Format(DateCalc($hash{$key}{date}, $Config{lastbizday},
+				      undef, 2), 0, "%dt");
+      if ($age > 5) {
+	warn "Ignoring $hash{$key}{name} with old date $hash{$key}{date}\n";
+	#if $Config{debug};
+	$hash{$key}{date} = "N/A";
+	next;
+      }
+      
       if (defined($Config{updatedate})) {        # and if we have an override
 	$hash{$key}{date} = $Config{updatedate}; # use it
-	warn "Overriding date for $hash{$key}{name} to $Config{updatedate}";
+	warn "Overriding date for $hash{$key}{name} to $Config{updatedate}\n";
       } else {
-	warn "$hash{$key}{name} has $hash{$key}{date}";
+	warn "$hash{$key}{name} has date $hash{$key}{date}\n";
       }
     }
 
-    if (($hash{$key}{close} == $hash{$key}{previous_close}) 
-	and ($hash{$key}{change} != 0)) {
-      $hash{$key}{previous_close} = $hash{$key}{close} - $hash{$key}{change};
+    if (($hash{$key}{day_close} == $hash{$key}{previous_close}) 
+	and ($hash{$key}{day_change} != 0)) {
+      $hash{$key}{previous_close} = $hash{$key}{day_close} 
+	- $hash{$key}{day_change};
       warn "Adjusting previous close for $key from close and change\n";
     }
   }
@@ -969,11 +1101,14 @@ sub UpdateDatabase {		# update content in the db at end of day
   my ($stmt, $sth, $rv, $ra, @symbols);
 
   $stmt = qq{  select distinct symbol
-	       from portfolio p
+	       from stockinfo
 	       where symbol != '' };
-  $stmt .= "   and $res " if (defined($res));
+  $stmt .= qq{   and symbol in (select distinct symbol 
+			        from portfolio where $res)
+	     } if defined($res);
   $stmt .= " order by symbol;";
-
+  
+  print "$stmt\n" if $Config{debug};
   @symbols = @{ $dbh->selectcol_arrayref($stmt) };
   print join " ", @symbols, "\n" if $Config{verbose};
 
@@ -1029,7 +1164,7 @@ sub UpdateInfoData {		# update a row in the info table
     $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
     print "$cmd\n" if $Config{debug};
     print "$hash{$key}{symbol} " if $Config{verbose};
-    $dbh->do($cmd) or warn "\nFailed for $hash{$key}{symbol} with $cmd";
+    $dbh->do($cmd) or warn "Failed for $hash{$key}{symbol} with $cmd\n";
   }
 }
 
@@ -1078,7 +1213,9 @@ I<analyse> stock market data.
 I<Downloads> are available of current (or rather: 15 or 20
 minute-delayed) price and company data as well as of historical price
 data.  Both forms can be stored in an SQL database (for which we
-currently default to B<PostgreSQL>).
+currently default to B<PostgreSQL> though B<MySQL> is supported as
+well; furthermore any database reachable by means of an B<ODBC>
+connection should work).
 
 I<Analysis> currently consists of performance and risk
 analysis. Performance reports comprise a profit-and-loss (or 'p/l' in
@@ -1101,8 +1238,10 @@ More documentation is in the Perl source code.
 =head1 DATABASE LAYOUT
 
 The easiest way to see the table design is to look at the content of
-the B<setup_beancounter> script. It creates five tables: I<stockinfo>,
-I<stockprices>, I<fxprices>, I<portfolio> and I<indices>.
+the B<setup_beancounter> script. It creates the five tables
+I<stockinfo>, I<stockprices>, I<fxprices>, I<portfolio> and
+I<indices>. Note also that is supports the creation of database for
+both B<PostgreSQL> and B<MySQL>.
 
 =head2 THE STOCKINFO TABLE
 
@@ -1135,7 +1274,7 @@ information. It is indexed by both I<date> and I<symbol>:
 	    day_low		float4,
 	    day_high		float4,
 	    day_close		float4,
-	    change		float4,
+	    day_change		float4,
 	    bid			float4,
 	    ask			float4,
 	    volume		int4
@@ -1153,7 +1292,7 @@ The I<fxprices> table contains (daily) foreign exchange rates. It can be used to
 	    day_low		float4,
 	    day_high		float4,
 	    day_close		float4,
-	    change		float4
+	    day_change		float4
 
 Similar to the I<stockprices> table, it is index on I<date> and I<symbol>.
 
@@ -1177,7 +1316,7 @@ The I<indices> table links a stock I<symbol> with one or several
 market indices:
 
 	    symbol   		varchar(12) not null,
-	    index		varchar(12) not null
+	    stockindex		varchar(12) not null
 
 =head1 BUGS
 
@@ -1221,3 +1360,4 @@ American quotes which was already very useful for the real-time ticker
 F<http://eddelbuettel.com/dirk/code/smtm.html>.
 
 =cut
+
