@@ -1,7 +1,7 @@
 #
 #  BeanCounter.pm --- A stock portfolio performance monitoring toolkit
 #
-#  Copyright (C) 1998 - 2006  Dirk Eddelbuettel <edd@debian.org>
+#  Copyright (C) 1998 - 2009  Dirk Eddelbuettel <edd@debian.org>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.103 2007/10/04 03:23:25 edd Exp $
+#  $Id: BeanCounter.pm,v 1.105 2009/12/23 02:00:41 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -43,6 +43,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     DatabaseHistoricalData
 	     DatabaseHistoricalFXData
 	     DatabaseHistoricalUBCFX
+	     DatabaseHistoricalOandAFX
 	     DatabaseInfoData
 	     ExistsDailyData
 	     ExistsFXDailyData
@@ -53,6 +54,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     GetDailyData
 	     GetFXData
 	     GetFXDatum
+             GetOandAFXData
 	     GetUBCFXData
 	     GetUBCFXHash
 	     GetYahooCurrency
@@ -75,7 +77,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.103 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.105 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -400,6 +402,63 @@ sub GetUBCFXHash {
     $res{$cur} = $res->[1]->[$i+1];
   }
   return \%res;			# return the new hash
+}
+
+
+## get FX data from OandA.com
+sub GetOandAFXData {
+  my ($symbol, $from, $to) = @_;
+
+  my $base = $Config{currency};	# instead of unconditionally requesting USD
+
+  ## we need the dates as yyyy, mm and dd
+  my ($fy,$fm,$fd,$ty,$tm,$td);	
+  ($fy,$fm,$fd) = ($from =~ m/(\d\d\d\d)(\d\d)(\d\d)/);
+  ($ty,$tm,$td) = ($to =~ m/(\d\d\d\d)(\d\d)(\d\d)/);
+
+  ## build the query URL
+  my $url = "http://www.oanda.com/convert/fxhistory?lang=en&";
+  $url .= "date1=$fm%2F$fd%2F$fy&";
+  $url .= "date=$tm%2F$td%2F$ty&date_fmt=us&";
+  $url .= "exch=$symbol&exch2=&expr=$Config{currency}&expr2=";
+  $url .= "&margin_fixed=0&SUBMIT=Get+Table&format=CSV&redirected=1";
+  print "Url is $url\n" if $Config{debug};
+
+  my @qr;			# results will be collected here
+  my $ua = RequestAgent->new;
+  $ua->env_proxy;		# proxy settings from *_proxy env. variables.
+  $ua->proxy('http', $PROXY) if defined $PROXY;
+  $ua->timeout($TIMEOUT) if defined $TIMEOUT;
+
+  my $state = 0;
+  foreach (split('\015?\012',$ua->request(GET $url)->content)) {
+    my $line = $_;
+    if ($state == 0) {
+      if ($_ =~ m|<PRE>|) {
+	$state += 1;
+	$line =~ s|<PRE>||;
+      }	    
+      #next;
+    }
+    if ($state == 1) {
+      $state += 1 if $_ =~ m|</PRE>|;
+      #next;
+    }
+    next unless $state == 1;
+    #print "--> $_\n" if $Config{debug};
+    #$state = $_ !~ m|</PRE>|;
+    ## split the csv stream with quotewords() from Text::ParseWords
+    #my @q = quotewords(',', 0, $_);
+    #my @fx = splice(@q, -$nsym); # last $nsym are the quotes
+    #push (@qr, [$q[1], @fx]);
+    #print $q[1], " ", join(" ", @fx), "\n" if $Config{debug};
+
+    push (@qr, $line);
+    print $line, "\n" if $Config{debug};
+  }
+
+  return \@qr;
+
 }
 
 sub getIso2YahooCurrencyHashRef() {
@@ -1372,6 +1431,37 @@ sub DatabaseHistoricalUBCFX {
   }
 }
 
+sub DatabaseHistoricalOandAFX {
+  my ($dbh, $aref, @arg) = @_;
+
+  my ($cmd, %data);
+  foreach my $line (@$aref) {	# loop over all retrieved data
+    ## split the csv stream with quotewords() from Text::ParseWords
+    my @q = quotewords(',', 0, $line);
+    $data{date} = UnixDate(ParseDate($q[0]), "%Y%m%d");
+    my $i = 1;
+    foreach my $fx (@arg) {
+      if (ExistsFXDailyData($dbh,$fx,%data)) { # update data if it exists
+	$cmd = "update fxprices set ";
+	$cmd .= "day_close = " . $q[1] . " "  .
+   	    "where currency = '$fx' and date  = '$data{date}'";
+      } else {
+	$cmd  = "insert into fxprices (currency, date, day_close) ";
+        $cmd .= "values ('$fx', '$data{date}', $q[1] )";
+      }
+      $i++;
+      if ($Config{commit}) {
+	print "$cmd\n" if $Config{debug};
+	$dbh->do($cmd) or die $dbh->errstr;
+      }
+    }
+    #print "Done with $fx (using $symbol)\n" if $Config{verbose};
+  }
+  if ($Config{commit}) {
+    $dbh->commit();
+  }
+}
+
 sub DatabaseInfoData {		# initialise a row in the info table
   my ($dbh, %hash) = @_;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
@@ -1510,6 +1600,9 @@ sub ParseDailyData {		# stuff the output into the hash
     } elsif ($ra->[20] =~ m/(\S*)M$/) {
       # keep it in millions
       $hash{$key}{market_capitalisation} = $1;
+    } elsif ($ra->[20] =~ m/(\S*)K$/) {      
+      # reported in thousands -- convert to millions
+      $hash{$key}{market_capitalisation} = $1*(1e-3);
     } else {
       # it's not likely a number at all -- pass it on
       $hash{$key}{market_capitalisation} = $ra->[20];

@@ -2,7 +2,7 @@ Source: beancounter
 Section: misc
 Priority: optional
 Maintainer: Dirk Eddelbuettel <edd@debian.org>
-Standards-Version: 3.7.2
+Standards-Version: 3.8.3
 Build-Depends-Indep: libdate-manip-perl, libstatistics-descriptive-perl, libfinance-yahooquote-perl, libdbi-perl
 Build-Depends: debhelper (>= 5.0.0)
 

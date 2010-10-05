@@ -3,7 +3,7 @@
 #
 #   beancounter --- A stock portfolio performance monitoring tool
 #
-#   Copyright (C) 1998 - 2006  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 1998 - 2009  Dirk Eddelbuettel <edd@debian.org>
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.88 2007/10/04 03:22:57 edd Exp $
+#   $Id: beancounter,v 1.90 2009/12/23 02:10:14 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -34,12 +34,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.88 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.90 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.8";		# updated from the debian/rules Makefile
+my $version = "0.8.9";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2007/10/04 03:22:57 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2009/12/23 02:10:14 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -327,13 +327,12 @@ sub display_status {
       * $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
     $totalshares{$name} += $shares->{$key};
   }
-  my ($assets,$weightedreturn,$assetbase) = (0,0,0);
+  my ($assets,$weightedreturn,$assetbase,$err) = (0,0,0,0);
   foreach my $name (sort keys %value) {
     my $value = $value{$name};
     my ($daysheld,$return) = ("", "");
     if (defined($pdate->{$name})) { # if we have a purchase date
-      $daysheld = Delta_Format(DateCalc($pdate->{$name}, $date,
-					undef, 2), "approx", 0, "%dt");
+      $daysheld = Delta_Format(DateCalc($pdate->{$name}, $date, \$err, 2), "approx", 0, "%dt");
       if (defined($cost->{$name}) and $daysheld >= 0) {
  	$return = ($prices->{$name} / $cost->{$name} - 1) 
 	  * 100 * Sign($totalshares{$name});
@@ -396,14 +395,13 @@ sub display_longstatus {
     $value{$key} += $shares->{$key} * $prices->{$name} 
       * $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
   }
-  my ($assets,$weightedreturn,$assetbase) = (0,0,0);
+  my ($assets,$weightedreturn,$assetbase,$err) = (0,0,0,0);
   foreach my $key (sort keys %value) {
     my ($name,$count) = split /:/, $key;
     my $value = $value{$key};
     my ($daysheld,$return,$fxthen,$fxnow) = ("", "", 1.0, 1.0);
     if (defined($pdate->{$key})) { # if we have a purchase date
-      $daysheld = Delta_Format(DateCalc($pdate->{$key}, $date,
-					undef, 2), "approx", 0, "%dt");
+      $daysheld = Delta_Format(DateCalc($pdate->{$key}, $date, \$err, 2), "approx", 0, "%dt");
       if (defined($cost->{$key}) and $daysheld >= 0 and $cost->{$key} != 0) {
 	if ($fx->{$name} ne $Config{currency}) {
 	  $fxthen = GetFXDatum($dbh, $pdate->{$key}, $fx->{$name});
@@ -724,9 +722,10 @@ sub portfolio_retracement {
   ## need to do a sanity checks on the date
   die "Error: '$prevdatearg' not prior to '$datearg'.\n"
     unless (Date_Cmp(ParseDate($prevdatearg), ParseDate($datearg)) < 0);
+  my $err = 0;
   die "Error: '$prevdatearg' is not at least 30 days prior to '$datearg'.\n"
     unless (Delta_Format(DateCalc(ParseDate($prevdatearg), ParseDate($datearg),
-				  undef, 2), "approx", 0, "%dt") > 30);
+				  \$err, 2), "approx", 0, "%dt") > 30);
 
   my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
     = GetTodaysAndPreviousDates();
@@ -790,9 +789,10 @@ sub portfolio_risk {
   ## need to do a sanity checks on the date
   die "Error: '$prevdatearg' not prior to '$datearg'.\n"
     unless (Date_Cmp(ParseDate($prevdatearg), ParseDate($datearg)) < 0);
+  my $err = 0;
   die "Error: '$prevdatearg' is not at least 30 days prior to '$datearg'.\n"
     unless (Delta_Format(DateCalc(ParseDate($prevdatearg), ParseDate($datearg),
-				  undef, 2), "approx", 0, "%dt") > 30);
+				  \$err, 2), "approx", 0, "%dt") > 30);
 
   my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
     = GetTodaysAndPreviousDates();
@@ -962,18 +962,23 @@ sub fxbackpopulate {
     ##DatabaseHistoricalFXData($dbh, GetYahooCurrency($iso), @arr);
   } else {
     foreach my $iso (@arg) {
-      my $fx = GetYahooCurrency($iso);
-      if (defined($fx) and $fx ne "") {
-	print "   backpopulating $iso (using $fx) from $fromdate to $todate\n";
-	  #if $Config{debug};
-	my (@arr) = GetHistoricalData($fx, $fromdate, $todate);
-	PrintHistoricalData($fx, @arr) if $Config{verbose};
-	DatabaseHistoricalFXData($dbh, $fx, @arr);
-      } else {
-	print "** Ignoring $iso which is not currently known to " .
-	  "the internal tables\n";
-      }
-    }
+#       my $fx = GetYahooCurrency($iso);
+#       if (defined($fx) and $fx ne "") {
+      print "   backpopulating $iso (rel. to $Config{currency}) ".
+	  "from $fromdate to $todate\n";
+      my $aref = GetOandAFXData($iso, $fromdate, $todate);
+      PrintHistoricalData($iso, @{$aref}) if $Config{verbose};
+      DatabaseHistoricalOandAFX($dbh, $aref, @arg);
+
+# 	  #if $Config{debug};
+# 	my (@arr) = GetHistoricalData($fx, $fromdate, $todate);
+# 	PrintHistoricalData($fx, @arr) if $Config{verbose};
+# 	DatabaseHistoricalFXData($dbh, $fx, @arr);
+#       } else {
+# 	print "** Ignoring $iso which is not currently known to " .
+# 	  "the internal tables\n";
+#       }
+     }
   }
 }
 

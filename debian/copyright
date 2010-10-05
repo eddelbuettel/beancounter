@@ -5,8 +5,12 @@ This package was both written and put together for Debian by Dirk
 Eddelbuettel <edd@debian.org>. The sources can also be obtained from 
 	http://dirk.eddelbuettel.com/code/beancounter.html
 
-Beancounter is released under the GNU General Public License.  On a Debian
-GNU/Linux systems, the complete text of GNU General Public License can be
-found in the file /usr/share/common-licenses/GPL.
+Copyright (C) 1998 - 2009  Dirk Eddelbuettel
+
+License: GPL-2
+
+On a Debian GNU/Linux system, the GPL-2 license is included
+in the file /usr/share/common-licenses/GPL-2.
+
 
 

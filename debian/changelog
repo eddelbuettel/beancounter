@@ -1,3 +1,17 @@
+beancounter (0.8.9) unstable; urgency=low
+
+  * Minor bugfix releases:
+
+    o DateCalc() now requires an error code variable, so supply one
+  
+    o finally release the OandA fx code			(Closes: #532743)
+
+  * debian/control: Standards-Version: increased to 3.8.3
+  
+  * debian/copyright: Updated to newer format
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Tue, 22 Dec 2009 20:13:59 -0600
+
 beancounter (0.8.8) unstable; urgency=low
 
   * Minor bugfix releases:
