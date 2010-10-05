@@ -1,3 +1,15 @@
+beancounter (0.8.6) unstable; urgency=low
+
+  * Minor bugfix releases:
+  
+    o [BeanCounter.pm]: Tolerate undef values in daily price updates
+  
+    o [BeanCounter.pm]: Allow host argument to be set from ~/.beancounterrc
+  
+    o [setup_beanconter,update_beancounter]: Make these bash scripts
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Thu, 23 Mar 2006 21:29:56 -0600
+
 beancounter (0.8.5) unstable; urgency=low
 
   * Minor update and fixes thanks to a set of excellent patches 

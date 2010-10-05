@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.100 2006/03/09 02:09:21 edd Exp $
+#  $Id: BeanCounter.pm,v 1.101 2006/03/22 04:16:28 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -75,7 +75,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.100 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.101 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -229,6 +229,8 @@ sub GetConfig {
   } else {
     $Config{ubcfx} = 0;
   }
+  # pre-load a default host argument
+  $Config{host} = $hostarg if defined($hostarg);
 
   unless ( -f $file ) {
     warn "Config file $file not found, ignored.\n";
@@ -250,8 +252,9 @@ sub GetConfig {
   $Config{dbsystem} = $dbsystem if defined($dbsystem);
   $Config{odbc} = 1 if defined($dbsystem) and lc $dbsystem eq "odbc";
 
-  # host is needed only for the DBI-Pg or DBI-mysql interface
-  $Config{host} = $hostarg if defined($hostarg);	# default localhost 
+  # but allow command-line argument to override 
+  $Config{host} = $hostarg 	
+      if defined($hostarg) and $hostarg ne "localhost";	
 
 
   if (defined($extrafx)) {
@@ -1030,8 +1033,11 @@ sub DatabaseDailyData {		# a row to the dailydata table
     if (ExistsDailyData($dbh, %{$hash{$key}})) {
       my @vals = ();
       foreach my $col (@cols) {
-          $hash{$key}{$col} =~ s/^\s*N\/A\s*$//;
-          push(@vals, $hash{$key}{$col});
+	  if ($hash{$key}{$col} =~ m/^\s*N\/A\s*$/) {
+	      push(@vals, undef);
+	  } else {
+	      push(@vals, $hash{$key}{$col});
+	  }
       }
       if ($Config{commit}) {
           if (!defined($updSth)) {
@@ -1039,14 +1045,18 @@ sub DatabaseDailyData {		# a row to the dailydata table
           }
           $updSth->execute(@vals)
               and $updSth->finish()
-              or warn $dbh->errstr . "Update failed for $hash{$key}{symbol} with [$updStmt]\n";
+              or warn $dbh->errstr . "Update failed for " .
+	      	"$hash{$key}{symbol} with [$updStmt]\n";
       }
     }
     else {
       my @vals = ();
       foreach my $col (@cols) {
-          $hash{$key}{$col} =~ s/^\s*N\/A\s*$//;
-          push(@vals, $hash{$key}{$col});
+	  if ($hash{$key}{$col} =~ m/^\s*N\/A\s*$/) {
+	      push(@vals, undef);
+	  } else {
+	      push(@vals, $hash{$key}{$col});
+	  }
       }
       if ($Config{commit}) {
           if (!defined($insSth)) {
@@ -1054,7 +1064,8 @@ sub DatabaseDailyData {		# a row to the dailydata table
           }
           $insSth->execute(@vals)
               and $insSth->finish()
-              or warn $dbh->errstr . "Insert failed for $hash{$key}{symbol} with [$insStmt]\n";
+              or warn $dbh->errstr . "Insert failed for " .
+	      	"$hash{$key}{symbol} with [$insStmt]\n";
       }
     }
   }

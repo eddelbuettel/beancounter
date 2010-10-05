@@ -26,7 +26,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
 	      'NAME'		=> 'Finance::BeanCounter',
-	      'VERSION'		=> '0.8.5',
+	      'VERSION'		=> '0.8.6',
 	      'PREREQ_PM'   	=> { "LWP::UserAgent"   => 1.62,
 				     "HTTP::Request"    => 1.23,
 				     "HTML::Parser"     => 2.20,
