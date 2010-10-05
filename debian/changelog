@@ -1,3 +1,20 @@
+beancounter (0.7.4) unstable; urgency=low
+
+  *  Bug fix release with several contributed patches:
+  
+     - [BeanCounter.pm]: Added portfolio export function GetPortfolioData which
+       will eventually be used by smtm and others, provided by Kevin Kim
+  
+     - [BeanCounter.pm]: Ensure proxy information is set, provided by Joao Costa
+  
+     - [BeanCounter.pm]: Ensure data written to stockprices table has no NAs so 
+       good data should never be overwritten by bad data, also provided by Joao Costa
+
+     - [beancounter]: Historical data from non-US exchanges needs to be retrieved
+       in patches of 200, implemented in patch provided by Matthew Jurgens
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Wed,  2 Jun 2004 21:19:52 -0500
+
 beancounter (0.7.3) unstable; urgency=low
 
   * Bug fix release:

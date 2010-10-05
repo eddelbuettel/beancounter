@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.49 2004/01/24 23:45:07 edd Exp $
+#   $Id: beancounter,v 1.50 2004/05/28 02:42:25 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -32,12 +32,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.49 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.50 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.7.3";		# updated from the debian/rules Makefile
+my $version = "0.7.4";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2004/01/24 23:45:07 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2004/05/28 02:42:25 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -569,11 +569,66 @@ sub backpopulate {
     my $stmt = qq{ select symbol from stockinfo where symbol = ? };
     my $sth = $dbh->prepare($stmt);
     my $rv = $sth->execute(uc $symbol);
+
+    # Yahoo only returns .csv for non-us stocks in 200 data point lots
+    my @startdates;
+    my @enddates;
+
+    # build an array pair of start and endates which increment from
+    # $fromdate to $todate in about 190 business day steps
+    my $yahoostartdate = $fromdate;
+    my $yahooenddate = substr DateCalc($yahoostartdate,
+				       "+190 business days"),0,8;
+
+    # enter/continue this loop if end date is still further 
+    # out than $yahooenddate
+    while ($yahooenddate < $todate) {
+      print "Date Pair: $yahoostartdate to $yahooenddate\n" 
+	if $Config{verbose};
+      push @startdates,$yahoostartdate;
+      push @enddates,$yahooenddate;
+      # move the start date of the next pair to 1 past end of the last pair
+      $yahoostartdate = substr DateCalc($yahooenddate,
+					"+1 business days"),0,8;
+      # calculate the next end date - add 190 business days
+      $yahooenddate = substr DateCalc($yahoostartdate,
+				      "+190 business days"),0,8;	
+
+    }
+
+    # get the last date pair which will end precisely on $todate
+    if ($yahooenddate >= $todate) {
+      # this date range does not require any breaking up
+
+      print "Final Date Pair: $yahoostartdate to $todate\n" 
+	if $Config{verbose};
+      push @startdates,$yahoostartdate;
+      push @enddates,$todate;
+    }
+
+    # write all the stocks we find into the db
     while (my $r = $sth->fetch) {
-      print "   adding $r->[0] from $fromdate to $todate\n";
-      my @arr = GetHistoricalData($r->[0], $fromdate, $todate);
-      PrintHistoricalData($r->[0], @arr) if $Config{verbose};
-      DatabaseHistoricalData($dbh, $r->[0], @arr);
+      # roughly, if a symbol has a non-us exchange ie it has a dot in 
+      # the symbol name then yahoo will only give us 200 data points at 
+      # one go so we need to loop through the various dates
+      if ($r->[0]=~/.+\..+/) {
+        # loop through the startdates/enddates array pairs getting 
+	#the data as we go
+        while ($yahoostartdate=pop @startdates) {
+	  # get the matching end date as well
+	  $yahooenddate=pop @enddates;
+	  print "   Adding $r->[0] from $yahooenddate to $yahoostartdate\n";
+	  my @arr = GetHistoricalData($r->[0], 
+				      $yahoostartdate, $yahooenddate);
+          PrintHistoricalData($r->[0], @arr) if $Config{verbose};
+          DatabaseHistoricalData($dbh, $r->[0], @arr);
+        }
+      } else {
+      	print "   Adding $r->[0] from $fromdate to $todate\n";
+        my @arr = GetHistoricalData($r->[0], $fromdate, $todate);
+        PrintHistoricalData($r->[0], @arr) if $Config{verbose};
+        DatabaseHistoricalData($dbh, $r->[0], @arr);
+      }
     }
     $sth->finish;
   }

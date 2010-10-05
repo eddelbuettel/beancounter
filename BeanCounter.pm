@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.63 2004/04/03 04:41:15 edd Exp $
+#  $Id: BeanCounter.pm,v 1.66 2004/05/28 03:02:51 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -53,6 +53,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     GetFXData
 	     GetFXMaps
 	     GetHistoricalData
+	     GetPortfolioData
 	     GetPriceData
 	     GetRetracementData
 	     GetRiskData
@@ -68,7 +69,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.63 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.66 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -272,6 +273,20 @@ sub GetDailyData {		# use Finance::YahooQuote::getquote
   # This uses the 'return an entire array' approach of Finance::YahooQuote.
   my @Args = @_;
 
+  if (defined($Config{proxy})) {
+    $Finance::YahooQuote::PROXY = $Config{proxy};
+  }
+  if (defined($Config{firewall}) and
+      $Config{firewall} ne "" and 
+      $Config{firewall} =~ m/.*:.*/) {
+    my @q = split(':', $Config{firewall}, 2);
+    $Finance::YahooQuote::PROXYUSER = $q[0];
+    $Finance::YahooQuote::PROXYPASSWD = $q[1];
+  }
+  if (defined($Config{timeout})) {
+    $Finance::YahooQuote::TIMEOUT = $Config{timeout} if $Config{timeout};
+  }
+
   #my $url = "http://quote.yahoo.com/d" .
   #  "?f=snl1d1t1c1p2va2bapomwerr1dyj1x&s=";
   #my $array = GetQuote($url,@NA); # get all North American quotes
@@ -326,6 +341,22 @@ sub GetHistoricalData {		# get a batch of historical quotes from Yahoo!
   } else {
     die "No luck with symbol $symbol\n";
   }
+}
+
+sub GetPortfolioData {
+    my ($dbh, $res) = @_;
+    my ($stmt, $sth);
+
+    # get the portfolio data
+    $stmt  = "select symbol, shares, currency, type, owner, cost, date ";
+    $stmt .= "from portfolio ";
+    $stmt .= "where $res" if (defined($res));
+    print "GetPortfolioData():\n\$stmt = $stmt\n" if $Config{debug};
+
+    $sth = $dbh->prepare($stmt);
+    $sth->execute();
+    my $data_ref = $sth->fetchall_arrayref({});
+    return $data_ref;
 }
 
 sub GetPriceData {
@@ -465,7 +496,7 @@ sub GetFXData {
   return (\%fx_prices, \%prev_fx_prices);
 }
 
-
+## NB no longer used as we employ Finance::YahooQuote directly
 sub GetQuote {			# taken from Dj's Finance::YahooQuote
   my ($URL,@symbols) = @_;	# and modified to allow for different URL
   my ($x,@q,@qr,$ua,$url);	# and the simple filtering below as well
@@ -804,18 +835,27 @@ sub DatabaseDailyData {		# a row to the dailydata table
     }
 
     if (ExistsDailyData($dbh, %{$hash{$key}})) {
-      $cmd = "update stockprices set" .
- 	     "  previous_close = $hash{$key}{previous_close}," .
-	     "  day_open       = $hash{$key}{day_open}," .
-	     "  day_low        = $hash{$key}{day_low}," .
-	     "  day_high       = $hash{$key}{day_high}," .
-	     "  day_close      = $hash{$key}{day_close}," .
-	     "  day_change     = $hash{$key}{day_change}," .
-	     "  bid            = $hash{$key}{bid}," .
-	     "  ask            = $hash{$key}{ask}," .
-	     "  volume         = $hash{$key}{volume} " .
-	     "where symbol     = '$hash{$key}{symbol}' " .
-	     "and date         = '$hash{$key}{date}'";
+      $cmd = "update stockprices set";
+      $cmd.= " previous_close = $hash{$key}{previous_close}," 
+	if ($hash{$key}{previous_close} !~ /'?N\/A'?/ );
+      $cmd.= " day_open       = $hash{$key}{day_open}, " 
+	if ($hash{$key}{day_open} !~ /'?N\/A'?/ );
+      $cmd.= " day_low        = $hash{$key}{day_low}, " 
+	if ($hash{$key}{day_low} !~ /'?N\/A'?/ );
+      $cmd.= " day_high       = $hash{$key}{day_high}, " 
+	if ($hash{$key}{day_high} !~ /'?N\/A'?/ );
+      $cmd.= " day_close      = $hash{$key}{day_close}, ";
+      $cmd.= " day_change     = $hash{$key}{day_change}, " 
+	if ($hash{$key}{day_change} !~ /'?N\/A'?/ );
+      $cmd.= " bid            = $hash{$key}{bid}, " 
+	if ($hash{$key}{bid} !~ /'?N\/A'?/ );
+      $cmd.= " ask            = $hash{$key}{ask}, " 
+	if ($hash{$key}{ask} !~ /'?N\/A'?/ );
+      $cmd.= " volume         = $hash{$key}{volume}, " 
+	if ($hash{$key}{volume} ne '0' );
+      $cmd.= "where symbol     = '$hash{$key}{symbol}' ";
+      $cmd.= "and date         = '$hash{$key}{date}'";
+      $cmd =~ s/, where/ where/;
     } else {
       $cmd = "insert into stockprices values (" . 
              "'$hash{$key}{symbol}'," . 

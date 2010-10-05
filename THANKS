@@ -13,7 +13,7 @@ Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
 	for initial MySQL patches, numerous design discussions + suggestions
         and the patch to allow 'update' to either insert or update
 Max Bott <Max.Bott@affa.gov.au> 
-	for the bug report on quotes in company name's (DatabaseInfoData)      
+	for the bug report on quotes in company name's (DatabaseInfoData)   
 Peter Kim <pykim@gte.net>
         for the update-in-batches-of-100 patch 
 Ken Neighbors <ken@nsds.com> 
@@ -37,6 +37,13 @@ Joao Pedro
         for noting that password should be passwd in example.beancounterrc
 Phil Homewood
         for a patch dealing with 'times 100' scaling in FX rates 
+Joao Antunes Costa for two patches testing for NAs in db updates, and
+        ensuring firewall proxy information is set
+Kevin Kim 
+        for patches integrating beancounter with smtm
+Matthew Jurgens
+	for a patch letting the non-US historical run batches of just 
+        under 200 data points to accomodate a Yahoo! restriction
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 
