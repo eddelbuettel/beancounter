@@ -24,12 +24,12 @@ The general installation sequence remains unchanged.
 7.  beancounter ready for your use, re-read usage instructions in
     beancounter.html and BeanCounter.html
 
-NB: step 5. is REQUIRED even on an initial beancounter installation
-(yes, it should be called automatically by setup_beancounter at step 4).
+NB: step 6. is REQUIRED even on an initial beancounter installation
+(yes, it should be called automatically by setup_beancounter at step 5).
 
 
 
-If, at step 4, you get message like:
+If, at step 5, you get message like:
    setup_beancounter: syntax error at line 37: `progname=$' unexpected
 
 You aren't running a sh that understands bash syntax. You will need to
@@ -37,12 +37,10 @@ get and install bash (on your own) or use the korn shell (ksh) that ships
 with SUN Solaris 2.x.
 
 To use ksh, the first line of each file setup_beancounter and
-update_beancounter should be changed to:
-#!/bin/ksh -e
+update_beancounter should be changed to: #!/bin/ksh -e
 
 
-
-If, at step 4, you get the database error message like:
+If, at step 5, you get the database error message like:
    *** Error: No postgresql user 'ras'
 
    We were unable to start psql as the user 'ras' does not exist
@@ -72,12 +70,12 @@ NB: this situation will likely occur in the setup_beancounter and
 update_beancounter scripts as well, you can either make the changes
 listed below now, or fix each error one step at a time ...
 
-Then repeat step 4.
+Then repeat step 5.
 
 
 If you continue to get the database error message above and are sure
 the user id is valid and the database daemon is running or if, at step
-4, you get an error from psql like:
+5, you get an error from psql like:
    psql: FATAL:  user "-l" does not exist
 or
    psql: FATAL:  user "-c" does not exist
@@ -114,7 +112,7 @@ to note the fact that this condition does occur in environments other
 than mine ;-). Please indicate your OS and shell in the message.
 
 
-If, when running update_beancounter at step 5, you get a message like:
+If, when running update_beancounter at step 6, you get a message like:
    grep: illegal option -- q
    Usage: grep -hblcnsviw pattern file . . .
 

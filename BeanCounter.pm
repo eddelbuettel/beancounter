@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.60 2004/02/05 04:53:49 edd Exp $
+#  $Id: BeanCounter.pm,v 1.62 2004/03/02 22:41:20 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.60 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.62 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -1247,7 +1247,6 @@ sub ScrubDailyData {          # stuff the output into the hash
   ## on public holidays. We will have to find a way to filter this
   ##
   foreach my $key (keys %hash) {# now check the date
-
     if ($hash{$key}{date} eq "N/A") {
       warn "Not scrubbing $hash{$key}{symbol}\n" if $Config{debug};
       next;
@@ -1280,6 +1279,20 @@ sub ScrubDailyData {          # stuff the output into the hash
       $hash{$key}{previous_close} = $hash{$key}{day_close} 
 	- $hash{$key}{day_change};
       warn "Adjusting previous close for $key from close and change\n";
+    }
+
+    # Yahoo! decided, on 2004-02-26, to change the ^X indices from
+    # US Dollar to US Cent, apparently.
+    if ($hash{$key}{symbol} =~ /^\^X/) {
+      if (Date_Cmp(ParseDate($hash{$key}{date}), ParseDate("20040226")) > 0) {
+	warn "Scaling $key data from dollars to pennies\n" if $Config{debug};
+        $hash{$key}{previous_close} /= 100;
+        $hash{$key}{day_open} /= 100;
+        $hash{$key}{day_low} /= 100;
+        $hash{$key}{day_high} /= 100;
+        $hash{$key}{day_close} /= 100;
+        $hash{$key}{day_change} /= 100;
+      }
     }
   }
   return %hash;

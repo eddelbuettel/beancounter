@@ -38,7 +38,7 @@ host=localhost
 
 #  Set the database password -- not needed if e.g. the database 
 #  grants eg access locally. Hence defaults to 'undef'.
-#password=joesecret
+#passwd=joesecret
 
 #  Declare that we want to connect using ODBC rather than via the
 #  Perl DBD driver for PostgreSQL or MySQL. See beancounter(1) for an

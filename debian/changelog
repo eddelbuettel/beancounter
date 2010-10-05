@@ -1,9 +1,28 @@
+beancounter (0.7.2) unstable; urgency=low
+
+  * Bug fix release:
+
+    - [BeanCounter.pm:] Scale FX data retrieved after 20040226 by a factor 
+      of 100 to correct for Yahoo's move from dollars to cents. Initial 
+      patch by Phil Homewood augmented with Date_Cmp() use.
+  
+    - README.non-gnu: small corrections by Robert A. Schmied
+  
+    - t/01base.t: Added simple and relatively meaningless test at the
+      repeated request of the good folks at CPAN. Beancounter really needs
+      and existing database to work with which we can't assume at build
+      time, so the testing potential is somewhat limited. As we load the
+      module, most of the (run-time) Depends now need to be in Build-Depends.
+    - debian/control: Augmented Build-Depends accordingly
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Tue,  2 Mar 2004 21:22:44 -0600
+
 beancounter (0.7.1) unstable; urgency=low
 
   * Bug fix release:
 
-      - [BeanCounter.pm:] Don't return from GetConfig() when no per-user config file
-        is found but simply skip reading the file. 
+    - [BeanCounter.pm:] Don't return from GetConfig() when no per-user 
+      config file is found but simply skip reading the file. 
 
  -- Dirk Eddelbuettel <edd@debian.org>  Wed,  4 Feb 2004 22:59:57 -0600
 

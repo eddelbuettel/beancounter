@@ -8,7 +8,7 @@ version	:= $(shell head -1 debian/changelog | \
 			perl -nle 'm/\S+\s+\((\S+)\)/ && print $$1')
 debtmp	:= $(shell pwd)/debian/$(package)
 
-srcdir  := ../../progs/perl/beancounter
+srcdir  := /home/edd/src/progs/perl/beancounter
 webdir  := /home/edd/www/code/beancounter
 
 host	:= $(shell hostname)
@@ -32,7 +32,8 @@ update:
 		$(srcdir)/beancounter_schema_mysql.txt 		\
 		$(srcdir)/beancounter_schema_sqlite.txt 	\
 		$(srcdir)/setup_beancounter			\
-		$(srcdir)/update_beancounter			.
+		$(srcdir)/update_beancounter			\
+		$(srcdir)/t/					.
 
         # update the $$version field in the perl code as well as in
         # the two support scripts
@@ -81,6 +82,7 @@ build-stamp:
 	pod2html --flush BeanCounter.pm > BeanCounter.html
         #pod2man          $(package) > $(package).1
 	$(MAKE)
+	$(MAKE) test
 	touch build-stamp
 
 clean:
