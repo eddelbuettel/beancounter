@@ -1,3 +1,14 @@
+beancounter (0.6.1) unstable; urgency=low
+
+  * Bug fix release:
+
+    - BeanCounter.pm: Force uppercase'ing of stock symbols prior to 
+      storing either daily or historical records in the database.
+  
+    - debian/rules: Include flip_symbol.sh in examples/ dir
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Mon, 30 Dec 2002 21:41:01 -0600
+
 beancounter (0.6.0) unstable; urgency=low
 
   * New release with the following new features:

@@ -89,7 +89,7 @@ binary-indep: build
 	$(MAKE) 		install PREFIX=$(debtmp)/usr
 	dh_perl	
 	dh_installdocs		THANKS TODO README README.Debian
-	dh_installexamples	example.beancounterrc 
+	dh_installexamples	example.beancounterrc flip_symbol.sh
         #dh_installmenu
         #dh_installinit
         #dh_installcron

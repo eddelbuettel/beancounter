@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.44 2002/12/28 20:21:55 edd Exp $
+#  $Id: BeanCounter.pm,v 1.45 2002/12/31 03:37:36 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.44 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.45 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -756,6 +756,7 @@ sub DatabaseHistoricalData {
   my ($dbh, $symbol, @res) = @_;
   my $checked = 0;		# flag to ensure not nonsensical or errors
   my %data;			# hash to store data of various completenesses
+  $symbol = uc $symbol;		# make sure symbols are uppercase'd
   foreach $ARG (@res) {		# loop over all supplied symbols
     # make sure the first line of data is correct so we don't insert garbage
     if ($checked==0 and m/Date(,Open,High,Low)?,Close(,Volume)?/) {
@@ -965,7 +966,7 @@ sub ParseDailyData {		# stuff the output into the hash
 
   foreach my $ra (@rra) {	# now split these into reference to the arrays
     my $key = $ra->[0];
-    $hash{$key}{symbol}         = $ra->[0];
+    $hash{$key}{symbol}         = uc $ra->[0];
     $hash{$key}{name}           = RemoveTrailingSpace($ra->[1]);
     $hash{$key}{day_close}      = ParseNumeric($ra->[2]);
     unless ($hash{$key}{date} = GetDate($ra->[3])) {
