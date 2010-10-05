@@ -1,7 +1,7 @@
 #
 #  BeanCounter.pm --- A stock portfolio performance monitoring toolkit
 #  
-#  Copyright (C) 1998, 1999, 2000  Dirk Eddelbuettel <edd@debian.org>
+#  Copyright (C) 1998 - 2001  Dirk Eddelbuettel <edd@debian.org>
 #  
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.12 2000/11/23 19:06:37 edd Exp $
+#  $Id: BeanCounter.pm,v 1.15 2001/03/09 04:25:05 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -32,6 +32,7 @@ use English;			# friendlier variable names
 use HTTP::Request::Common;	# grab data from Yahoo's web interface
 use LWP::UserAgent;		# for data queries from http://quote.yahoo.com
 use POSIX qw(strftime);		# for date formatting
+use Statistics::Descriptive;	# simple statistical functions
 use Text::ParseWords;		# parse .csv data more reliably
 
 @ISA = qw(Exporter);		# make these symbols known
@@ -42,6 +43,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     DatabaseHistoricalData
 	     DatabaseInfoData
 	     GetTodaysAndPreviousDates
+	     GetCashData
 	     GetConfig
 	     GetDate
 	     GetDateEU
@@ -49,6 +51,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     GetFXData
 	     GetHistoricalData 
 	     GetPriceData
+	     GetRiskData
 	     ParseDailyData 
 	     ParseNumeric 
 	     PrintHistoricalData
@@ -59,7 +62,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.12 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.15 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -78,10 +81,12 @@ sub ConnectToDb {		# log us into the database (PostgreSQL)
 
   if ($Config{odbc}) {
     $dbh = DBI->connect("dbi:ODBC:$Config{dsn}",
-			$Config{user}, $Config{passwd});
+			$Config{user}, $Config{passwd}, 
+			{ PrintError => 0, Warn => 1, AutoCommit => 0 });
   } else {
     $dbh = DBI->connect("dbi:Pg:dbname=beancounter;host=$Config{host}", 
-			$Config{user}, $Config{passwd});
+			$Config{user}, $Config{passwd},
+			{ PrintError => 0, Warn => 1, AutoCommit => 0 });
   }
   croak "No luck with database connection" unless ($dbh);
 
@@ -118,7 +123,7 @@ sub GetTodaysAndPreviousDates {
 
 
 sub GetConfig {
-  my ($file, $debug, $verbose, $fx, $extrafx) = @_;
+  my ($file, $debug, $verbose, $fx, $extrafx, $updatedate, $command) = @_;
 
   %Config = ();			# reset hash
 
@@ -157,12 +162,51 @@ sub GetConfig {
   close(FILE);
 
   $Config{currency} = $fx if defined($fx);
-  $Config{extrafx} = $extrafx if defined($extrafx);
-  
+
+  if (defined($extrafx)) {
+    unless ($command =~ /^(update|dailyjob)$/) {
+      carp "Warning: --extrafx ignored as not updating db\n";
+    } else {
+      $Config{extrafx} = $extrafx if defined($extrafx);
+    }
+  }
+
+  if (defined($updatedate)) {	# test the updatedate argument 
+    unless ($command =~ /^(update|dailyjob)$/) {
+      carp "Warning: --updatedate ignored as not updating db\n";
+    } else {
+      croak "Error: Invalid date $updatedate for --forceupdate"
+	unless (ParseDate($updatedate));
+      $Config{updatedate} =  UnixDate(ParseDate($updatedate),"%Y%m%d");
+    }
+  }
+
   print Dumper(\%Config) if $Config{debug};
   return %Config;
 }
 
+sub GetCashData {
+  my ($dbh, $date, $res) = @_;
+
+  my ($stmt, $sth, $rv, $ary_ref, $sym_ref, %cash);
+  my ($name, $value, $fx, $cost);
+  # get the symbols
+  $stmt  = "select name, value, currency, cost from cash ";
+  $stmt .= "where $res " if (defined($res));
+  $stmt .= "order by name";
+  $sth = $dbh->prepare($stmt);
+  $rv = $sth->execute(); 	# run query for report end date
+  while (($name, $value, $fx, $cost) = $sth->fetchrow_array) {
+    $cash{$name}{value} += $value; # adds if there are several
+    $cash{$name}{fx} = $fx;
+    $cash{$name}{cost} = $cost;
+    $dbh->commit();		# the ODBC driver needs that for a weird reason
+    ##$cost = '' unless defined($cost);
+    ##print "$name $value $fx $cost\n";
+  }
+  $sth->finish;
+  return(\%cash);
+}
 
 sub GetDailyData {		# use Finance::YahooQuote::getquote
   my @Args = @_;
@@ -309,11 +353,12 @@ sub GetPriceData {
 	      where symbol = ? and date <= ?
 	     };
   $sth = $dbh->prepare($stmt);
-  foreach $ra (@$sym_ref) {		
+  foreach $ra (@$sym_ref) {	
     $rv = $sth->execute($ra->[0], $date); # run query for report end date
     my $res = $sth->fetchrow_array;
     #print "$ra->[0] $res\n";
     $dates{$ra->[0]} = $res;
+    $dbh->commit();		# the ODBC driver needs that for a weird reason
   }
 
   # now get closing price etc at date
@@ -399,17 +444,153 @@ sub GetQuote {			# taken from Dj's Finance::YahooQuote
 }				
 
 
+sub GetRiskData {
+  my ($dbh,$date,$prevdate,$res,$fx_prices,$crit) = @_;
+
+  # get the symbols
+  my $stmt  = qq{select distinct p.symbol, i.name
+		 from portfolio p, stockinfo i
+		 where p.symbol = i.symbol };
+  $stmt .= "and $res " if (defined($res));
+  $stmt .= "order by symbol";
+  my $sth = $dbh->prepare($stmt);
+  my $rv = $sth->execute(); 	# run query for report end date
+  my $sref = $sth->fetchall_arrayref;
+
+  # compute volatility
+  $stmt  = qq{select day_close from stockprices 
+	      where symbol = ? and date <= ? and date >= ?
+	      order by date
+	     };
+  $sth = $dbh->prepare($stmt);
+  my (%vol, %quintile);
+  foreach my $ra (@$sref) {
+    $rv = $sth->execute($ra->[0], $date, $prevdate);
+    my $dref = $sth->fetchall_arrayref;	# get data
+    my $x = Statistics::Descriptive::Full->new();
+    for (my $i=1; $i<scalar(@{$dref}); $i++) { # add returns
+      $x->add_data($dref->[$i][0]/$dref->[$i-1][0] - 1);
+    }
+    printf("%16s: stdev %6.2f min %6.2f max %6.2f\n",
+	   $ra->[1], $x->standard_deviation, $x->min, $x->max)
+      if $Config{debug};
+    $vol{$ra->[1]} = $x->standard_deviation;
+    if ($x->count() < 100) {
+      print "$ra->[1]: Only ", $x->count(), " data points, ",
+      	"need at least 100 for percentile calculation\n" if $Config{debug};
+      $quintile{$ra->[1]} = undef;
+    } else {
+      $quintile{$ra->[1]} = $x->percentile(1);
+    }
+  }
+
+  # compute correlations
+  $stmt  = qq{select a.day_close, b.day_close 
+	      from stockprices a, stockprices b
+	      where a.symbol = ? and b.symbol = ? 
+	      and a.date <= ? and a.date >= ?
+	      and a.date = b.date
+	      order by a.date
+	     };
+  $sth = $dbh->prepare($stmt);
+  my %cor;
+  foreach my $ra (@$sref) {		
+    foreach my $rb (@$sref) {
+      my $res = $ra->[0] cmp $rb->[0];
+      if ($res < 0) {
+	$rv = $sth->execute($ra->[0], $rb->[0], $date, $prevdate);
+	my $dref = $sth->fetchall_arrayref;	# get data
+	my $x = Statistics::Descriptive::Full->new();
+	my $y = Statistics::Descriptive::Full->new();
+	for (my $i=1; $i<scalar(@{$dref}); $i++) { # add returns
+	  $x->add_data($dref->[$i][0]/$dref->[$i-1][0] - 1);
+	  $y->add_data($dref->[$i][1]/$dref->[$i-1][1] - 1);
+	}
+	my @arr = $x->least_squares_fit($y->get_data());
+	$cor{$ra->[1]}{$rb->[1]} = $arr[2];
+	printf("%6s %6s correlation %6.4f\n", 
+	       $ra->[1], $rb->[1], $arr[2]) if $Config{debug}; 
+      } elsif ($res > 0) {
+	$cor{$ra->[1]}{$rb->[1]} = $cor{$rb->[1]}{$ra->[1]};
+      } else {
+	$cor{$ra->[1]}{$rb->[1]} = 1;
+      }
+    }
+  }
+
+  # for each symbol, get most recent date subject to supplied date
+  my %maxdate;
+  $stmt  = qq{select max(date) from stockprices 
+	      where symbol = ? and date <= ?
+	     };
+  $sth = $dbh->prepare($stmt);
+  foreach my $ra (@$sref) {		
+    $rv = $sth->execute($ra->[0], $date); # run query for report end date
+    my $res = $sth->fetchrow_array;
+    $maxdate{$ra->[1]} = $res;
+    $dbh->commit();
+  }
+
+  # get position values
+  my (%pos, $possum);
+  $stmt =    qq{select p.shares, d.day_close, p.currency
+ 		from portfolio p, stockprices d, stockinfo i
+ 		where d.symbol = p.symbol 
+ 		and d.symbol = i.symbol 
+ 		and d.date = ?
+ 		and d.symbol = ?
+ 	       };
+  $stmt .= "and $res " if (defined($res));
+  $sth = $dbh->prepare($stmt);
+  foreach my $ra (@$sref) {		
+    $rv = $sth->execute($maxdate{$ra->[1]}, $ra->[0]); 
+    while (my ($shares, $price, $fx) = $sth->fetchrow_array) {
+      print "$ra->[1] $shares $price\n" if $Config{debug};
+      my $amount = $shares * $price *
+	$fx_prices->{$fx} / $fx_prices->{$Config{currency}};
+      $pos{$ra->[1]} += $amount;
+    }
+  }
+  $sth->finish;
+
+  # aggregate risk: 
+  # VaR is z_crit * sqrt(horizon) * sqrt (X.transpose * Sigma * X)
+  # where X is position value vector and Sigma the covariance matrix
+  # given that Perl is not exactly a language for matrix calculus (as
+  # eg GNU Octave), we flatten the computation into a double loop
+  my $sum = 0;
+  foreach my $pkey (keys %pos) {
+    foreach my $vkey (keys %vol) { 
+      $sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} 
+	* $cor{$vkey}{$pkey};
+    }
+  }
+  my $var = $crit * sqrt($sum);
+
+
+  ## marginal var
+  my %margvar;
+  foreach my $outer (keys %pos) {
+    my $saved = $pos{$outer};
+    my $sum = 0;
+    $pos{$outer} = 0;
+    foreach my $pkey (keys %pos) {
+      foreach my $vkey (keys %vol) { 
+	$sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} 
+	  * $cor{$vkey}{$pkey};
+      }
+    }
+    $margvar{$outer} = $crit * sqrt($sum) - $var;
+    $pos{$outer} = $saved;
+  }
+
+  return ($var, \%pos, \%vol, \%quintile, \%margvar);
+}
+
 sub DatabaseDailyData {		# a row to the dailydata table
   my ($dbh, %hash) = @_;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     print "$hash{$key}{symbol} " if $Config{verbose};
-
-    if ($hash{$key}{date} ne $Config{today}) {
-      carp "Warning: $hash{$key}{symbol} date $hash{$key}{date} ".
-	"is not current date $Config{today}";
-      # just warn, let's not ignore the data
-      ## next;
-    }
 
     my $cmd = "insert into stockprices values (" . 
               "'$hash{$key}{symbol}'," . 
@@ -427,6 +608,7 @@ sub DatabaseDailyData {		# a row to the dailydata table
     print "$cmd\n" if $Config{debug};
     print "$hash{$key}{symbol} " if $Config{verbose};
     $dbh->do($cmd) or carp "\nFailed for $hash{$key}{symbol} with $cmd\n";
+    $dbh->commit();
   }
 }
 
@@ -449,6 +631,7 @@ sub DatabaseFXDailyData {
 		  $hash{$key}{change}
 		 )
       or carp "\nFailed for $fx at $hash{$key}{date}";
+    $dbh->commit();
   }
 }
 
@@ -476,6 +659,7 @@ sub DatabaseHistoricalData {
       }
       print "$cmd\n" if $Config{debug};
       $dbh->do($cmd) or croak $dbh->errstr;
+      $dbh->commit();
     } else {
       ;				# do nothing with bad data
     }
@@ -503,6 +687,7 @@ sub DatabaseInfoData {		# update a row in the info table
     print "$cmd\n" if $Config{debug};
     print "$hash{symbol} " if $Config{verbose};
     $dbh->do($cmd) or croak $dbh->errstr;
+    $dbh->commit();
   }
 }
 
@@ -657,6 +842,57 @@ sub ReportDailyData {		# detailed display / debugging routine
   }
 }
 
+sub ScrubDailyData {          # stuff the output into the hash
+  my %hash = @_;              # we receive
+
+  ## Check the date supplied from Yahoo!
+  ##
+  ## The first approach was to count all dates for a given market
+  ## This works well when you have, say, 3 Amex and 5 NYSE stock, and
+  ## Yahoo just gets one date wrong -- we can then compare the one "off-date"
+  ## against, say, four "good" dates and override
+  ## Unfortunately, this doesn't work so well for currencies where you
+  ## typically only get one, or maybe two.
+  ##
+  ## my %date;                   # date comparison hash
+  ## foreach my $key (keys %hash) {# store all dates for market
+  ##   $date{$hash{$key}{exchange}}{$hash{$key}{date}}++; # and count'em
+  ## }
+  ## -- and later 
+  ##    if ($date{$hash{$key}{exchange}}{$hash{$key}{date}} # and outnumbered
+  ##	  < $date{$hash{$key}{exchange}}{$Config{today}}) {
+  ##	carp("Override: $hash{$key}{name}: $hash{$key}{date} has only " .
+  ##	     "$date{$hash{$key}{exchange}}{$hash{$key}{date}} votes,\n\tbut " .
+  ##	     "$hash{$key}{exchange} has " .
+  ##	     "$date{$hash{$key}{exchange}}{$Config{today}} " .
+  ##	     "votes for $Config{today}");
+  ##	$hash{$key}{date} = $Config{today};
+  ##      } else {
+  ##	carp("$hash{$key}{name} has date $hash{$key}{date}, " .
+  ##	     "not $Config{today} but no voting certainty");
+  ##      }
+  ##
+  ##    $date{$hash{$key}{exchange}}{$Config{today}} = 0 
+  ##	  unless defined($date{$hash{$key}{exchange}}{$Config{today}});
+  ##
+  ## So now we simply override if (and only if) the --forceupdate
+  ## argument is used. This is still suboptimal if eg you are running this
+  ## on public holidays. We will have to find a way to filter this
+  ##
+  foreach my $key (keys %hash) {# now check the date
+
+    if ($hash{$key}{date} ne $Config{today}) { # if it is not today
+
+      if (defined($Config{updatedate})) { # and if we have an override
+	$hash{$key}{date} = $Config{updatedate}; # use it
+	carp "Overriding date for $hash{$key}{name} to $Config{updatedate}";
+      } else {
+	carp "$hash{$key}{name} has $hash{$key}{date}";
+      }
+    }
+  }
+  return %hash;
+}                   
 
 sub UpdateDatabase {		# update content in the db at end of day
   my ($dbh, $res) = @_;
@@ -676,8 +912,9 @@ sub UpdateDatabase {		# update content in the db at end of day
     push @symbols, $ra->[0];	# collect all the symbols affected 
   }
   $sth->finish;
-  my @arr = GetDailyData(@symbols);	# retrieve _all_ the data
-  my %data = ParseDailyData(@arr);
+  my @arr = GetDailyData(@symbols);# retrieve _all_ the data
+  my %data = ParseDailyData(@arr); # put it into a hash
+  %data = ScrubDailyData(%data);   # and "clean" it      
   ReportDailyData(%data) if $Config{verbose};
   UpdateInfoData($dbh, %data);
   DatabaseDailyData($dbh, %data);
@@ -716,6 +953,7 @@ sub UpdateFXDatabase {
   if (scalar(@symbols) > 0) {	# if there are FX symbols
     my @arr = GetDailyData(@symbols); # retrieve _all_ the data
     my %data = ParseDailyData(@arr);
+    %data = ScrubDailyData(%data);   # and "clean" it 
     ReportDailyData(%data) if $Config{verbose};
     DatabaseFXDailyData($dbh, %data);
   }
@@ -788,18 +1026,23 @@ minute-delayed) price and company data as well as of historical price
 data.  Both forms can be stored in an SQL database (for which we
 currently default to B<PostgreSQL>).
 
-I<Analysis> currently consists mostly of a profit-and-loss (or 'p/l'
-in the lingo) report which can be run over arbitrary time intervals
-such as C<--fromdate 'friday six months ago' --todate 'yesterday'> --
-in essence, whatever the wonderful B<Date::Manip> module understands.
+I<Analysis> currently consists of performance and risk
+analysis. Performance reports comprise a profit-and-loss (or 'p/l' in
+the lingo) report which can be run over arbitrary time intervals such
+as C<--prevdate 'friday six months ago' --date 'yesterday'> -- in
+essence, whatever the wonderful B<Date::Manip> module understands --
+as well as dayendreport which defaults to changes in the last trading
+day. A risk report show parametric and non-parametric value-at-risk
+(VaR) estimates.
 
 Most available functionality is also provided in the reference
 implementation B<beancounter>, a convenient command-line script.
 
-The API might change anytime. The low version number really means to
-say that the code is not in its final form yet. Things might change. 
+The API might change and evolve over time. The low version number
+really means to say that the code is not in its final form yet, but it
+has been in use for well over two years. 
 
-Documentation is at this point mostly in the Perl module source code.
+More documentation is in the Perl source code.
 
 =head1 DATABASE LAYOUT
 
@@ -924,6 +1167,3 @@ American quotes which was already very useful for the real-time ticker
 F<http://rosebud.sps.queensu.ca/~edd/code/smtm.html>.
 
 =cut
-
-
-

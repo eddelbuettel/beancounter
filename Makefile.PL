@@ -33,7 +33,8 @@ WriteMakefile(
 				     "Text::ParseWords" => 3.1,
 				     "Date::Manip"	=> 5.35,
 				     "DBI::DBD"		=> 10.7,
-				     "DBD::Pg"		=> 0.93
+				     "DBD::Pg"		=> 0.93,  # or DBD::ODBC
+				     "Statistics::Descriptive" => 2.4
 				   },      
 	      ($] >= 5.005 ?
 	       ('ABSTRACT'   => 'Stock portfolio performance monitoring tool',

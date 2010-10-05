@@ -1,16 +1,35 @@
+beancounter (0.3.0) unstable; urgency=low
+
+  * New release with the following code changes
+    - new command "risk" for report with value-at-risk at (VaR) percentile
+      estimates, using both the standard (parametric) approach as well as
+      a nonparametric quantile estimate
+      "risk" also computes marginal value-at-risk (slow for large portfolios)
+      "risk" requires the Statistics::Descriptive modules
+    - new option "--forceupdate <date>" to permit overriding of a faulty
+      date supplied by Yahoo! Finance (which is becoming more common)
+    - new command "allreports" for dayend, status and risk reports all in once
+    - added status and risk reports to jobs ran by "dailyjob" command
+    - new ScrubDailyData routine; currently only using the "--forceupdate
+      date" check on the pricing date supplied by Yahoo!
+    - prevdate defaults to "six months ago" (better default for risk report)
+    - "status" also shows cash holding from table `cash' (preliminary feature)
+    - improved internal logic for argument and option checking + db connection
+    - improved report calculations, report display and documentation
+    - documentation corrected (command is 'delete', not 'deletestock')
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Thu, 29 Mar 2001 19:18:54 -0600
+
 beancounter (0.2.1) unstable; urgency=low
 
   * Bug fix release:
     - setup_beancounter: change last fromdate,todate to prevate,date
-    - setup_beancounter: use NT, not NT.TO, to avoid FX use in demo
-    - beancounter: Call psql, not destroydb or dropdb, to delete db
+    - setup_beancounter: use NT, not NT.TO, to avoid FX in demo
+    - beancounter: Use psql, not destroydb or dropdb, to delete db
     - debian/control: Also depend on libdbd-pg-perl (Closes: #85363)
-  * Improved documentation by adding 
-    - example.beancounterrc:  New file with (commented) rc file example
-    - beancounter, BeanCounter.pm: Expanded POD documentation  
-  
- -- Dirk Eddelbuettel <edd@debian.org>  Sat, 10 Feb 2001 13:28:36 -0600
 
+ -- Dirk Eddelbuettel <edd@debian.org>  Fri,  9 Feb 2001 22:45:54 -0600
+  
 beancounter (0.2.0) unstable; urgency=low
 
   * New release with the following code changes
@@ -31,8 +50,8 @@ beancounter (0.2.0) unstable; urgency=low
 beancounter (0.1.1) unstable; urgency=low
 
   * Bugfix release:
-    - BeanCounter.pm: corrected minor typo in DatabaseInfoData
-    - debian/rules: don't create beancounter.1 -- Makefile.PL does that too
+  * BeanCounter.pm: corrected minor typo in DatabaseInfoData
+  * debian/rules: don't create beancounter.1 -- Makefile.PL does that too
 
  -- Dirk Eddelbuettel <edd@debian.org>  Tue, 25 Jul 2000 22:47:40 -0400
 

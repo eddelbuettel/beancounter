@@ -2,7 +2,8 @@
 * stock splits
 
 * annualised returns
-  [now done in status command] ]
+  [was done in status command, currently turned off; probably needs another
+   switch to allow a date after which we annualise, say a year]
 
 * clean up code
 
@@ -15,7 +16,7 @@
 * allow "restrictions" on beancounter operations, eg do a portfolio update at
   13:00 EST with the restriction of doing it only for shares with currencies
   that are GBP or EUR (or SEK or DKK ...) to get the European market
-  [ done, also added 'extrafx' argument ]
+  [ done in 0.2.0, also added 'extrafx' argument ]
 
 * there is buglet that rears its head when a stock is added to portfolio 
   during business hours as its current price is also added for that day ...
@@ -24,4 +25,15 @@
   cron within beancounter. Either we do update for the current day (as we do
   now, which has the problem) or don't (in which case we might never get that
   datum if we updated after the daily cron run)
+
+* fx quotes are currently retrieved via Yahoo from the Philadelphia exchange
+  -- but that means no quotes are available on US holidays. We also have no
+  access to historical FX data
+
+* Yahoo seems to return bad date information every now and then. A
+  "scrubbing" between retrieval and databasing might help: we can check if
+  other data points for the same exchange have a different date and then use
+  this as an override. Might be overkill.
+
+* Allow for cash holdings
 

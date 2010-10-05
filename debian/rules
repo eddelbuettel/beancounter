@@ -1,7 +1,7 @@
 #! /usr/bin/make -f
 #                                                       -*- makefile -*-
 # debian/rules file for the Debian/GNU Linux beancounter package
-# Copyright (C) 2000 by Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2001 by Dirk Eddelbuettel <edd@debian.org>
 
 package	:= $(shell grep Package debian/control | sed 's/^Package: //')
 version	:= $(shell head -1 debian/changelog | \
@@ -11,23 +11,15 @@ debtmp	:= $(shell pwd)/debian/tmp
 srcdir  := /home/edd/progs/perl/beancounter
 webdir  := /home/edd/www/code/beancounter
 
-# New Perl Policy by Raphael
-ifndef PERL
-PERL = /usr/bin/perl
-endif
-
-TMP     =`pwd`/debian/tmp
-archlib =`$(PERL) -MConfig -e 'print $$Config{installarchlib}'`
-config  =INSTALLDIRS=perl INSTALLMAN1DIR=$(TMP)/usr/share/man/man1 INSTALLMAN3DIR=$(TMP)/usr/share/man/man3 INSTALLPRIVLIB=$(TMP)/usr/lib/perl5 INSTALLARCHLIB=$(TMP)$(archlib) INSTALLSCRIPT=$(TMP)/usr/bin
-
 update:
 	cp -af	$(srcdir)/BeanCounter.pm 	\
 		$(srcdir)/beancounter 		\
 		$(srcdir)/README 		\
 		$(srcdir)/TODO	 		\
+		$(srcdir)/THANKS 		\
 		$(srcdir)/Makefile.PL 		\
+		$(srcdir)/example.beancounterrc	\
 		$(srcdir)/setup_beancounter	\
-		$(srcdir)/example.beancounterrc \
 		$(srcdir)/update_beancounter		.
 
 webdir:
@@ -44,7 +36,8 @@ webdir:
 build: build-stamp
 build-stamp:
 	dh_testdir
-	$(PERL) Makefile.PL $(config)
+	#$(PERL) Makefile.PL $(config)
+	perl Makefile.PL INSTALLDIRS=vendor	
 	pod2html --flush $(package) > $(package).html
 #	pod2man          $(package) > $(package).1
 	$(MAKE)
@@ -68,16 +61,16 @@ binary-indep: build
 	dh_clean -k
 #	dh_installdirs		usr/bin usr/share/man/man1
 #	dh_installdirs		usr/bin 
-	$(MAKE) 		prefix=$(debtmp)/usr pure_install
+	#$(MAKE) 		prefix=$(debtmp)/usr pure_install
+	$(MAKE) 		install PREFIX=$(debtmp)/usr
 	dh_perl	
-	dh_installdocs		
+	dh_installdocs		THANKS TODO README README.Debian
 	dh_installexamples	example.beancounterrc 
 #	dh_installmenu
 #	dh_installinit
 #	dh_installcron
 	dh_installmanpages	
 	dh_undocumented		setup_beancounter.1 update_beancounter.1
-	dh_installmanpages	
 	dh_installchangelogs	
 	dh_compress
 	dh_fixperms
