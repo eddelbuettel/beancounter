@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.83 2006/02/16 03:09:04 edd Exp $
+#   $Id: beancounter,v 1.87 2006/03/08 03:55:29 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -34,12 +34,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.83 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.87 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.4";		# updated from the debian/rules Makefile
+my $version = "0.8.5";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2006/02/16 03:09:04 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2006/03/08 03:55:29 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -217,7 +217,7 @@ Examples:
     beancounter update --forceupdate today
     beancounter addportfolio SUNW:100:USD:401k:joe:14.10:20011205 VOD.L:50:GBP
     beancounter addstock CBOT LNUX RHAT COR.TO
-    beancounter backpopulate MSFT SUNW --prevdate 19940101 --date 19983112
+    beancounter backpopulate MSFT SUNW --prevdate 19940101 --date 19981231
     beancounter fxbackpopulate EUR --prevdate 20010101 --date yesterday
     beancounter dayendreport --restriction \"type = '401k'\"
     beancounter status --date 20000816 --restriction \"currency='USD'\"
@@ -462,9 +462,11 @@ sub display_riskreport {
   my (%var);
   my ($varsum, $assets) = 0;
   foreach my $pkey (keys %$pos) {
-    $var{$pkey} = $crit * sqrt($pos->{$pkey}**2 * $vol->{$pkey}**2);
-    $varsum += $crit * sqrt($pos->{$pkey}**2 * $vol->{$pkey}**2);
-    $assets += $pos->{$pkey};
+    if (defined($pos->{$pkey}) && defined($vol->{$pkey})) {
+      $var{$pkey} = $crit * sqrt($pos->{$pkey}**2 * $vol->{$pkey}**2);
+      $varsum += $crit * sqrt($pos->{$pkey}**2 * $vol->{$pkey}**2);
+      $assets += $pos->{$pkey};
+    }
   }
 
   my ($tl,$fl) = build_lines(79);
@@ -475,17 +477,24 @@ sub display_riskreport {
 	 "VaR", "margVaR", $tl); 
 
   foreach my $pkey (sort keys %$pos) {
-    printf("%-18s %3s %11.2f %13s %9.1f%%  %8d %7d\n", 
+    printf("%-18s %3s %11s %7s %7s %10s %9s %7d\n", 
 	   substr($pkey,0,17), 
 	   $Config{currency},	# NOT $fx->{$pkey}, !!
-	   $pos->{$pkey}, 
+	   defined($pos->{$pkey})
+	   ? sprintf("%11.2f", $pos->{$pkey})
+	   : 'N/A',
 	   defined($quintile->{$pkey}) 
-	   ? sprintf("%6.1f%% %7d", 
-		     100*$quintile->{$pkey}, 
-		     $pos->{$pkey}*$quintile->{$pkey}) 
-	   : "    N/A     N/A",
-	   100*sqrt(252)*$vol->{$pkey}, 
-	   -$var{$pkey},
+	   ? sprintf("%6.1f%%", 100*$quintile->{$pkey})
+	   : 'N/A',
+	   defined($quintile->{$pkey}) 
+	   ? sprintf("%7d", $pos->{$pkey}*$quintile->{$pkey}) 
+	   : 'N/A',
+	   defined($vol->{$pkey})
+	   ? sprintf("%9.1f%%", 100*sqrt(252)*$vol->{$pkey})
+	   : 'N/A', 
+	   defined($var{$pkey})
+	   ? sprintf("%8d", -($var{$pkey}))
+	   : 'N/A',
 	  $margvar->{$pkey});
   }
   printf("$fl\n%-18s %3s %11.2f  %24.1f%%  %8d\n$fl\n", 
@@ -522,6 +531,7 @@ sub split_stock {
     print " $arg ";
     my $rv = $sth->execute($arg, $date, $prev_date);
     my $dr = $sth->fetchall_arrayref;	# get data
+    $sth->finish;
     for (my $i=0; $i<scalar(@{$dr}); $i++) { # add returns
       my $cmd = "update stockprices set";
       $cmd.= " previous_close = $dr->[$i][1]/$splitby," 
@@ -564,6 +574,7 @@ sub split_stock {
     print " $arg ";
     my $rv = $sth->execute($arg);
     my $dr = $sth->fetchall_arrayref;	# get data
+    $sth->finish;
     for (my $i=0; $i<scalar(@{$dr}); $i++) { # add returns
       my $cmd = "update portfolio set";
       $cmd.= " shares = $dr->[$i][0]*$splitby,";
@@ -621,6 +632,7 @@ sub lsportfolio {
     }
     print "$tl\n";
   }
+  $sth->finish;
 }
 
 sub lspositions {
@@ -680,6 +692,7 @@ sub lspositions {
     }
     printf "$fl\nTotal profit or loss\t\t\t\t\t%18.2f\n$tl\n", $sum;
   }
+  $sth->finish;
 }
 
 sub day_end_report {
@@ -859,10 +872,13 @@ sub backpopulate {
   $fromdate = UnixDate(ParseDate($prevdatearg),"%Y%m%d") if ($prevdatearg); 
   $todate   = UnixDate(ParseDate($datearg),"%Y%m%d") if ($datearg); 
 
+  my $stmt = qq{ select symbol from stockinfo where symbol = ? };
+  my $sth;
+  if (@arg) {
+    $sth = $dbh->prepare($stmt);
+  }
   foreach my $symbol (@arg) {
     # we need to query the DB to see if this symbol was registered
-    my $stmt = qq{ select symbol from stockinfo where symbol = ? };
-    my $sth = $dbh->prepare($stmt);
     my $rv = $sth->execute(uc $symbol);
 
     # Yahoo only returns .csv for non-us stocks in 200 data point lots
@@ -937,18 +953,16 @@ sub fxbackpopulate {
   $fromdate = UnixDate(ParseDate($prevdatearg),"%Y%m%d") if ($prevdatearg); 
   $todate   = UnixDate(ParseDate($datearg),"%Y%m%d") if ($datearg); 
 
-  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
-
   if ($Config{ubcfx}) {		# if we use PACIFIC at UBC's Sauder School
     my $aref = GetUBCFXData(\@arg, $fromdate, $todate);
     #print "   backpopulating ", join(" ",@arg), 
     #	" from $fromdate to $todate\n" if $Config{debug};
     #no equiv. here: #PrintHistoricalData($iso, @arr) if $Config{verbose};
     DatabaseHistoricalUBCFX($dbh, $aref, @arg);
-    ##DatabaseHistoricalFXData($dbh, $iso2yahoo->{$iso}, @arr);
+    ##DatabaseHistoricalFXData($dbh, GetYahooCurrency($iso), @arr);
   } else {
     foreach my $iso (@arg) {
-      my $fx = $iso2yahoo->{$iso};
+      my $fx = GetYahooCurrency($iso);
       if (defined($fx) and $fx ne "") {
 	print "   backpopulating $iso (using $fx) from $fromdate to $todate\n";
 	  #if $Config{debug};
@@ -999,12 +1013,14 @@ sub add_portfolio {
 
   # statement for insertion into portfolio
   my $stmt = qq{insert into portfolio values ( ?, ?, ?, ?, ?, ?, ? );};
-  my $sth = $dbh->prepare($stmt);
+  my $sth;
 
   # statement to check if this symbol already in info
   my $infostmt = qq{ select symbol from stockinfo where symbol = ? };
-  my $infosth = $dbh->prepare($infostmt);
-
+  my $infosth;
+  if (@arg) {
+    $infosth = $dbh->prepare($infostmt);
+  }
   my @symbol;
 
   foreach my $arg (@arg) {	# and loop over the stocks
@@ -1015,7 +1031,11 @@ sub add_portfolio {
     $stock = uc $stock;		# uppercase it
     $fx = $Config{currency} unless defined($fx);
     if (defined($stock) and defined($nb)) {
+      if (!defined($sth)) {
+	$sth = $dbh->prepare($stmt);
+      }
       $sth->execute($stock, $nb, $fx, $type, $owner, $cost, $date);
+      $sth->finish;
       $dbh->commit();		# the ODBC driver needs that for a weird reason
     } else {
       warn "Ignoring invalid argument $arg\n";
@@ -1023,9 +1043,8 @@ sub add_portfolio {
 
     $infosth->execute($stock);
     push @symbol, $stock unless ($infosth->fetch);
+    $infosth->finish;
   }
-  $sth->finish;
-  $infosth->finish;
 
   if ($#symbol > -1) {		# if there are symbols to be added
     add_stock(@symbol)		# make sure 'new' stocks get added to DB
@@ -1054,6 +1073,7 @@ sub inactive_stock {
     $infosth->execute($stock);
 
     my ($symb, $active) = $infosth->fetchrow_array;
+    $infosth->finish;
     if (! $symb) {
       printf STDERR "Symbol %s not in database, cannot deactive\n", $stock;
     } else {
@@ -1076,6 +1096,7 @@ sub inactive_stock {
       print STDERR "Inactivating stock $stk\n" if $Config{verbose};
       # perform the access
       $sth->execute($stk);
+      $sth->finish;
       $dbh->commit();        # the ODBC driver needs that for a weird reason
     }
   }

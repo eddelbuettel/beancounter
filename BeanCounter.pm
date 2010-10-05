@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.94 2006/02/16 03:10:36 edd Exp $
+#  $Id: BeanCounter.pm,v 1.100 2006/03/09 02:09:21 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -55,7 +55,8 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     GetFXDatum
 	     GetUBCFXData
 	     GetUBCFXHash
-	     GetFXMaps
+	     GetYahooCurrency
+	     GetIsoCurrency
 	     GetHistoricalData
 	     GetPortfolioData
 	     GetPriceData
@@ -74,7 +75,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.94 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.100 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -85,41 +86,32 @@ sub BeanCounterVersion {
 
 
 sub ConnectToDb {		# log us into the database (PostgreSQL)
-  my $dbh = undef, $hoststr = "";
-
-  $hoststr = ";host=$Config{host}" unless $Config{host} eq "localhost";
-
+  my $hoststr = '';
+  $hoststr = "host=$Config{host}"
+	unless (grep(/^$Config{host}$/, ('localhost','127.0.0.1','::1/128')));
+  my $dsn = 'dbi:';
   if ($Config{odbc}) {
-    $dbh = DBI->connect("dbi:ODBC:$Config{dsn}",
-			$Config{user}, $Config{passwd}, 
-			{ PrintError => $Config{debug}, 
-			  Warn => $Config{verbose}, 
-			  AutoCommit => 0 });
+      $dsn .= "ODBC:$Config{dsn}";
   } elsif (lc $Config{dbsystem} eq "postgresql") {
-    $dbh = DBI->connect("dbi:Pg:dbname=$Config{dbname}" . $hoststr,
-			$Config{user}, $Config{passwd},
-			{ PrintError => $Config{debug}, 
-			  Warn => $Config{verbose}, 
-			  AutoCommit => 0 });
+      $dsn .= "Pg:dbname=$Config{dbname};${hoststr}";
   } elsif (lc $Config{dbsystem} eq "mysql") {
-    $dbh = DBI->connect("dbi:mysql:dbname=$Config{dbname}" . $hoststr,
-			$Config{user}, $Config{passwd},
-			{ PrintError => $Config{debug}, 
-			  Warn => $Config{verbose}, 
-			  AutoCommit => 0 });
+      $dsn .= "mysql:dbname=$Config{dbname};${hoststr}";
   } elsif (lc $Config{dbsystem} eq "sqlite") {
-    $dbh = DBI->connect("dbi:SQLite:dbname=$Config{dbname}","","",
-			{ PrintError => $Config{debug}, 
-			  Warn => $Config{verbose}, 
-			  AutoCommit => 0 });
+      $dsn .= "SQLite:dbname=$Config{dbname}";
+      $Config{user} = '';
+      $Config{passwd} = '';
   } elsif (lc $Config{dbsystem} eq "sqlite2") {
-    $dbh = DBI->connect("dbi:SQLite2:dbname=$Config{dbname}","","",
-			{ PrintError => $Config{debug}, 
-			  Warn => $Config{verbose}, 
-			  AutoCommit => 0 });
+      $dsn .= "SQLite2:dbname=$Config{dbname}";
+      $Config{user} = '';
+      $Config{passwd} = '';
   } else {
     die "Database system $Config{dbsystem} is not supported\n";
   }
+  my $dbh = DBI->connect($dsn, $Config{user}, $Config{passwd}, 
+			 { PrintError => $Config{debug}, 
+			   Warn => $Config{verbose}, 
+			   AutoCommit => 0 });
+  
   die "No luck with database connection\n" unless ($dbh);
 
   return $dbh;
@@ -128,7 +120,7 @@ sub ConnectToDb {		# log us into the database (PostgreSQL)
 
 sub CloseDB {
   my $dbh = shift;
-  $dbh->disconnect;
+  $dbh->disconnect or warn $dbh->errstr;
 }
 
 
@@ -306,6 +298,7 @@ sub GetCashData {
     $cash{$name}{fx} = $fx;
     $cash{$name}{cost} = $cost;
   }
+  $sth->finish();
   return(\%cash);
 }
 
@@ -406,29 +399,31 @@ sub GetUBCFXHash {
   return \%res;			# return the new hash
 }
 
-# map between ISO country codes and Yahoo symbols for the Philly exchange
-sub GetFXMaps {
-  my %iso2yahoo = (
-		   "AUD" => "^XAY",  	# was "^XAD", "AUDUSD=X",
-		   "CAD" => "^XCV", 	# was "^XCD", "CADUSD=X",
-		   "CHF" => "^XSY",	# was "^XSF", "CHFUSD=X",
-		   "EUR" => "^XEU",	# was "EURUSD=X",
-		   "GBP" => "^XBX",     # was "^XBP", "GBPUSD=X",
-		   "JPY" => "^XJZ",	# was "^XJY", "JPYUSD=X",
-		   "USD" => "----"
-		   ## deprecated  "DEM" => "^XDM"
-		  );
-  my %yahoo2iso = (
-		   "^XAY" => "AUD",
-		   "^XCV" => "CAD",
-		   "^XSY" => "CHF",
-		   "^XEU" => "EUR",
-		   "^XBX" => "GBP",
-		   "^XJZ" => "JPY",
-		   "----" => "USD"
-		   ## deprecated  "^XDM" => "DEM"
-		  );
-  return (\%iso2yahoo, \%yahoo2iso);
+sub getIso2YahooCurrencyHashRef() {
+    # map between ISO country codes and Yahoo symbols for the Philly exchange
+    return {"AUD" => "^XAY", # was "^XAD", "AUDUSD=X",
+	    "CAD" => "^XCV", # was "^XCD", "CADUSD=X",
+	    "CHF" => "^XSY", # was "^XSF", "CHFUSD=X",
+	    "EUR" => "^XEU", # was "EURUSD=X",
+	    "GBP" => "^XBX", # was "^XBP", "GBPUSD=X",
+	    "JPY" => "^XJZ", # was "^XJY", "JPYUSD=X",
+	    "USD" => "----"};
+}
+
+
+sub GetYahooCurrency($) {
+    my ($isoCurrency) = @_;
+    my $ref = getIso2YahooCurrencyHashRef();
+    return $ref->{$isoCurrency};
+}
+
+
+sub GetIsoCurrency($) {
+    my ($yahooCurrency) = @_;
+    my $ref = getIso2YahooCurrencyHashRef();
+    # Reverse the hash table, ie. yahoo => iso:
+    my %yahoo2isoHash = map { $ref->{$_} => $_ } keys(%$ref);
+    return $yahoo2isoHash{$yahooCurrency};
 }
 
 
@@ -498,8 +493,10 @@ sub GetPriceData {
   print "GetPriceData():\n\$stmt = $stmt\n" if $Config{debug};
 
   # for each symbol, get most recent date subject to supplied date:\n";
-  $sth = $dbh->prepare($stmt);
   foreach $ra (@symbols) {	
+    if (!defined($sth)) {
+      $sth = $dbh->prepare($stmt);
+    }
     $rv = $sth->execute($ra, $date); # run query for report end date
     my $res = $sth->fetchrow_array;
     $dates{$ra} = $res;
@@ -554,9 +551,12 @@ sub GetPriceData {
   print "GetPriceData():\n\$stmt = $stmt\n" if $Config{debug};
 
   # now get closing price etc at date
-  $sth = $dbh->prepare($stmt);
+  $sth = undef;
   my $i = 0;
   foreach $ra (@symbols) {		
+    if (!defined($sth)) {
+      $sth = $dbh->prepare($stmt);
+    }
     $rv = $sth->execute($dates{$ra}, $ra);
     while (($symbol, $name, $shares, $currency, $price, 
 	    $cost, $pdate, $prevprice) = $sth->fetchrow_array) {
@@ -576,6 +576,7 @@ sub GetPriceData {
       $purchdate{$name} = $pdate; # also store purchuse date on non-aggregate entry
       $cost{$name} = $cost;	  # also store purchuse cost on non-aggregate entry
     }
+    $sth->finish;
   }
 
   print Dumper(\%prices) if $Config{debug};
@@ -601,9 +602,12 @@ sub GetFXData {
 
   # get most recent date subject to supplied date
   my %fxdates;
-  my $sth = $dbh->prepare($stmt);
+  my $sth;
   foreach my $fxval (sort values %$fx) {
     next if $fxval eq 'USD';	# skip USD
+    if (!defined($sth)) {
+      $sth = $dbh->prepare($stmt);
+    }
     $rv = $sth->execute($fxval, $date); # run query for report end date
     my $res = $sth->fetchrow_array;
     $fxdates{$fxval} = $res;
@@ -616,13 +620,16 @@ sub GetFXData {
 	    };
   print "GetFXData():\n\$stmt = $stmt\n" if $Config{debug};
 
-  $sth = $dbh->prepare($stmt);
+  $sth = undef;
   my (%fx_prices,%prev_fx_prices);
   foreach my $fxval (sort values %$fx) {
     if ($fxval eq 'USD') {	
       $fx_prices{$fxval} = 1.0;
       $prev_fx_prices{$fxval} = 1.0;
     } else {
+      if (!defined($sth)) {
+        $sth = $dbh->prepare($stmt);
+      }
       $sth->execute($fxdates{$fxval}, $fxval);	# run query for FX cross
       my ($val, $prevval) = $sth->fetchrow_array
 	or die "Found no $fxval for $date in the beancounter database.\n " .
@@ -951,10 +958,13 @@ sub GetRiskData {
   # eg GNU Octave), we flatten the computation into a double loop
   my $sum = 0;
   foreach my $pkey (keys %pos) {
-    foreach my $vkey (keys %vol) { 
-      if (defined($vol{$vkey}) and defined($vol{$pkey})) {
-	 $sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} * 
-	     $cor{$vkey}{$pkey};
+    if (defined($pos{$pkey}) && defined($vol{$pkey})) {
+      foreach my $vkey (keys %vol) { 
+	if (defined($pos{$vkey}) && defined($vol{$vkey}) &&
+	    defined($cor{$vkey}{$pkey})) {
+	  $sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} * 
+	    $cor{$vkey}{$pkey};
+        }
       }
     }
   }
@@ -968,9 +978,14 @@ sub GetRiskData {
     my $sum = 0;
     $pos{$outer} = 0;
     foreach my $pkey (keys %pos) {
-      foreach my $vkey (keys %vol) { 
-	$sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} 
-	  * $cor{$vkey}{$pkey};
+      if (defined($pos{$pkey}) && defined($vol{$pkey})) {
+        foreach my $vkey (keys %vol) { 
+	  if (defined($pos{$vkey}) && defined($vol{$vkey}) &&
+	      defined($cor{$vkey}{$pkey})) {
+            $sum += $pos{$pkey} * $pos{$vkey} * $vol{$vkey} * $vol{$pkey} 
+	            * $cor{$vkey}{$pkey};
+	  }
+	}
       }
     }
     $margvar{$outer} = $crit * sqrt($sum) - $var;
@@ -983,7 +998,27 @@ sub GetRiskData {
 
 sub DatabaseDailyData {		# a row to the dailydata table
   my ($dbh, %hash) = @_;
-  my $cmd;
+  my @cols = ('previous_close', 'day_open', 'day_high', 'day_low',
+	      'day_close', 'day_change', 'bid', 'ask', 'volume');
+  my @updTerms = ();
+  foreach my $col (@cols) {
+    push(@updTerms, "$col = ?");
+  }
+  my $updStmt = 'update stockprices set ' . join(', ', @updTerms) .
+      ' where symbol = ? and date = ?';
+  print "$updStmt\n" if $Config{debug};
+  my $updSth;
+
+  push(@cols, 'symbol', 'date');
+  my @insTerms = ();
+  foreach my $col (@cols) {
+    push(@insTerms, '?');
+  }
+  my $insStmt = 'insert into stockprices (' . join(', ', @cols) .
+      ') values (' . join(', ', @insTerms) . ')';
+  print "$insStmt\n" if $Config{debug};
+  my $insSth;
+  
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     print "$hash{$key}{symbol} " if $Config{verbose};
 
@@ -993,61 +1028,48 @@ sub DatabaseDailyData {		# a row to the dailydata table
     }
 
     if (ExistsDailyData($dbh, %{$hash{$key}})) {
-      $cmd = "update stockprices set";
-      $cmd.= " previous_close = $hash{$key}{previous_close}," 
-	if ($hash{$key}{previous_close} !~ /'?N\/A'?/ );
-      $cmd.= " day_open       = $hash{$key}{day_open}, " 
-	if ($hash{$key}{day_open} !~ /'?N\/A'?/ );
-      $cmd.= " day_low        = $hash{$key}{day_low}, " 
-	if ($hash{$key}{day_low} !~ /'?N\/A'?/ );
-      $cmd.= " day_high       = $hash{$key}{day_high}, " 
-	if ($hash{$key}{day_high} !~ /'?N\/A'?/ );
-      $cmd.= " day_close      = $hash{$key}{day_close}, ";
-      $cmd.= " day_change     = $hash{$key}{day_change}, " 
-	if ($hash{$key}{day_change} !~ /'?N\/A'?/ );
-      $cmd.= " bid            = $hash{$key}{bid}, " 
-	if ($hash{$key}{bid} !~ /'?N\/A'?/ );
-      $cmd.= " ask            = $hash{$key}{ask}, " 
-	if ($hash{$key}{ask} !~ /'?N\/A'?/ );
-      $cmd.= " volume         = $hash{$key}{volume}, " 
-	if ($hash{$key}{volume} ne '0' );
-      $cmd.= "where symbol     = '$hash{$key}{symbol}' ";
-      $cmd.= "and date         = '$hash{$key}{date}'";
-      $cmd =~ s/, where/ where/;
-    } else {
-      $cmd = "insert into stockprices values (" . 
-             "'$hash{$key}{symbol}'," . 
-	     "'$hash{$key}{date}'," .
-	     "$hash{$key}{previous_close}," .
-	     "$hash{$key}{day_open}," .
-	     "$hash{$key}{day_low}," .
-	     "$hash{$key}{day_high}," .
-	     "$hash{$key}{day_close}," .
-	     "$hash{$key}{day_change}," .
-	     "$hash{$key}{bid}," .
-	     "$hash{$key}{ask}," .
-	     "$hash{$key}{volume})";
+      my @vals = ();
+      foreach my $col (@cols) {
+          $hash{$key}{$col} =~ s/^\s*N\/A\s*$//;
+          push(@vals, $hash{$key}{$col});
+      }
+      if ($Config{commit}) {
+          if (!defined($updSth)) {
+              $updSth = $dbh->prepare($updStmt) or die $dbh->errstr;
+          }
+          $updSth->execute(@vals)
+              and $updSth->finish()
+              or warn $dbh->errstr . "Update failed for $hash{$key}{symbol} with [$updStmt]\n";
+      }
     }
-    $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
-    print "$cmd\n" if $Config{debug};
-    print "$hash{$key}{symbol} " if $Config{verbose};
-    if ($Config{commit}) {
-      $dbh->do($cmd) or warn "Failed for $hash{$key}{symbol} with $cmd\n";
-      $dbh->commit();
+    else {
+      my @vals = ();
+      foreach my $col (@cols) {
+          $hash{$key}{$col} =~ s/^\s*N\/A\s*$//;
+          push(@vals, $hash{$key}{$col});
+      }
+      if ($Config{commit}) {
+          if (!defined($insSth)) {
+              $insSth = $dbh->prepare($insStmt) or die $dbh->errstr;
+          }
+          $insSth->execute(@vals)
+              and $insSth->finish()
+              or warn $dbh->errstr . "Insert failed for $hash{$key}{symbol} with [$insStmt]\n";
+      }
     }
   }
+  $dbh->commit() if $Config{commit};
 }
 
 
 sub DatabaseFXDailyData {
   my ($dbh, %hash) = @_;
-  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     if ($key eq "") {
  	print "Empty key in DatabaseFXDailyData, skipping\n" if $Config{debug};
 	next;
     }
-    my $fx = $yahoo2iso->{$hash{$key}{symbol}};
+    my $fx = GetIsoCurrency($hash{$key}{symbol});
     print "$fx ($hash{$key}{symbol})  " if $Config{debug};
     if (ExistsFXDailyData($dbh, $fx, %{$hash{$key}})) {
       # different sequence of parameters, see SQL statement above!
@@ -1149,101 +1171,85 @@ sub DatabaseFXDailyData {
 
 sub DatabaseHistoricalData {
   my ($dbh, $symbol, @res) = @_;
-  my $checked = 0;		# flag to ensure not nonsensical or errors
-  my %data;			# hash to store data of various completenesses
   $symbol = uc $symbol;		# make sure symbols are uppercase'd
-  foreach $ARG (@res) {		# loop over all supplied symbols
-    next if m/^<\!-- .*-->/;    # skip lines with html comments (April 2004)
-    # make sure the first line of data is correct so we don't insert garbage
-    if ($checked==0 and m/Date(,Open,High,Low)?,Close(,Volume)?/) {
-      $checked = tr/,//;
-      print "Checked now $checked\n" if $Config{verbose};
-    } elsif ($checked) {
-      my ($date, $open, $high, $low, $close, $volume, $cmd, $adjclose);
-      # based on the number of elements, ie columns, we split the parsing
-      if ($checked eq 6) {	# checked eq 6, so process adj. close
-	($date, $open, $high, $low, $close, $volume, $adjclose) = 
-	  split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y%m%d");
-        if ( $adjclose != $close && $close != 0 ) { # process split adjustment factor
-          my $split_adj = ($adjclose / $close);
-	  %data = (symbol    => $symbol,
-		   date      => $date,
-		   day_open  => $open * $split_adj,
-		   day_high  => $high * $split_adj,
-		   day_low   => $low  * $split_adj,
-		   day_close => $adjclose,
-		   volume    => $volume);
-        } else {		# no split adjustment necessary
-          %data = (symbol    => $symbol,
-                   date      => $date,
-                   day_open  => $open,
-                   day_high  => $high,
-                   day_low   => $low,
-                   day_close => $close,
-                   volume    => $volume);
-	}
-      } elsif ($checked eq 5) { # $checked eq 5
-	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y%m%d");
-	%data = (symbol    => $symbol,
-		 date	   => $date,
-		 day_open  => $open,
-		 day_high  => $high,
-		 day_low   => $low,
-		 day_close => $close,
-		 volume    => $volume);
-      } elsif ($checked eq 1) {	# only close for mutual funds
-	($date, $close) = split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y%m%d");
-	%data = (symbol    => $symbol,
-		 date	   => $date,
-		 day_close => $close);
-      } else {			# no volume for indices
-	($date, $open, $high, $low, $close) = split(/\,/, $ARG);
-	$date = UnixDate(ParseDate($date), "%Y%m%d");
-	%data = (symbol    => $symbol,
-		 date	   => $date,
-		 day_open  => $open,
-		 day_high  => $high,
-		 day_low   => $low,
-		 day_close => $close);
+
+  my %data = (symbol    => $symbol,
+	      date      => undef,
+	      day_open  => undef, 
+	      day_high  => undef,
+	      day_low   => undef, 
+	      day_close => undef,
+	      volume    => undef);
+
+  my @colNames = sort(keys(%data));
+  my @colRepl = ();
+  my @updTerms = ();
+  foreach my $col (@colNames) {
+      push(@colRepl, '?');
+      next if ($col eq 'symbol' || $col eq 'date');
+      push(@updTerms, "$col = ?");
+  }
+
+  my $insStmt = 'insert into stockprices (' . join(', ', @colNames) .
+      ') values (' . join(', ', @colRepl) . ')';
+  my $insSth;
+  my $updStmt = 'update stockprices set ' . join(', ', @updTerms) .
+      ' where symbol = ? and date = ?';
+  my $updSth;
+  print "DatabaseHistoricalData: insStmt is \"$insStmt\"\n" if $Config{debug};
+  print "DatabaseHistoricalData: updStmt is \"$updStmt\"\n" if $Config{debug};
+  
+  foreach my $line (@res) {		# loop over all supplied symbols
+    next if !defined($line);
+    ($data{date}, $data{day_open}, $data{day_high},
+     $data{day_low}, $data{day_close}, $data{volume},
+     $data{adjclose}) = split(/\,/, $line);
+    $data{date} = GetDate($data{date});
+    if (defined($data{date})) {
+      # If close was not supplied, we assume a mutual fund.
+      # So let close be open.
+      if (!defined($data{day_close})) {
+	$data{day_close} = $data{day_open};
+	$data{day_open} = undef;
+      }
+      elsif (defined($data{adjclose}) &&
+	     $data{adjclose} != $data{day_close} &&
+	     $data{day_close} != 0) { # process split adjustment factor
+	my $split_adj = $data{adjclose} / $data{day_close};
+	$data{day_open} *= $split_adj;
+	$data{day_high} *= $split_adj;
+	$data{day_low}  *= $split_adj;
       }
 
-      # now given the data, decide whether we add new data or update old data
-      if (ExistsDailyData($dbh,%data)) { # update data if it exists
-	$cmd = "update stockprices set ";
-	$cmd .= "volume    = $data{volume},"    if defined($data{volume});
-	$cmd .= "day_open  = $data{day_open},"  if defined($data{day_open});
-	$cmd .= "day_low   = $data{day_low},"   if defined($data{day_low});
-	$cmd .= "day_high  = $data{day_high},"  if defined($data{day_high});
-	$cmd .= "day_close = $data{day_close} "   .
-	        "where symbol = '$data{symbol}' " .
-		"and date     = '$data{date}'";
-      } else {			# insert
-	$cmd = "insert into stockprices (symbol, date,";
-	$cmd .= "day_open," if defined($data{day_open});
-	$cmd .= "day_high," if defined($data{day_high});
-	$cmd .= "day_low,"  if defined($data{day_low});
-	$cmd .= "day_close";
-	$cmd .= ",volume"  if defined($data{volume});
-	$cmd .= ") values ('$symbol', '$date', ";
-	$cmd .= "$data{day_open},"   if defined($data{day_open});
-	$cmd .= "$data{day_high},"   if defined($data{day_high});
-	$cmd .= "$data{day_low},"    if defined($data{day_low});
-	$cmd .= "$data{day_close}"; 
-	$cmd .= ",$data{volume} "    if defined($data{volume});
-        $cmd .= ");";
+      if (ExistsDailyData($dbh, %data)) {
+	my @colVals = ();
+	foreach my $col (@colNames) {
+	  next if ($col eq 'symbol' || $col eq 'date');
+	  $data{$col} = 'NULL' if !defined($data{$col});
+	  push(@colVals, $data{$col});
+        }
+	push(@colVals, $data{symbol}, $data{date});
+	if (!defined($updSth)) {
+	    $updSth = $dbh->prepare($updStmt) or die $dbh->errstr;
+	}
+	$updSth->execute(@colVals) or die $updSth->errstr;
+	$updSth->finish();
       }
-      if ($Config{commit}) {
-	print "$cmd\n" if $Config{debug};
-	$dbh->do($cmd) or die $dbh->errstr;
-	$dbh->commit();
+      else {
+	my @colVals = ();
+	foreach my $col (@colNames) {
+	  $data{$col} = 'NULL' if !defined($data{$col});
+	  push(@colVals, $data{$col});
+        }
+	if (!defined($insSth)) {
+	    $insSth = $dbh->prepare($insStmt) or die $dbh->errstr;
+	}
+	$insSth->execute(@colVals) or die $insSth->errstr;
+	$insSth->finish();
       }
-    } else {
-      ;				# do nothing with bad data
     }
   }
+  $dbh->commit() if $Config{commit};
   print "Done with $symbol\n" if $Config{verbose};
 }
 
@@ -1255,8 +1261,7 @@ sub DatabaseHistoricalFXData {
 
   my $cut = UnixDate(ParseDate("30-Dec-2003"), "%Y%m%d");
 
-  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
-  my $fx = $yahoo2iso->{$symbol};
+  my $fx = GetIsoCurrency($symbol);
   foreach $ARG (@res) {		# loop over all supplied symbols
     next if m/^<\!-- .*-->/;    # skip lines with html comments (April 2004)
     # make sure the first line of data is correct so we don't insert garbage
@@ -1393,43 +1398,36 @@ sub DatabaseInfoData {		# initialise a row in the info table
 
 sub ExistsInfoSymbol {
   my ($dbh, %hash) = @_;
-  my $stmt = qq{select symbol
-                from stockinfo
-                where symbol = ?
-                };
-
-  print "ExistsInfoSymbol():\n\$stmt = $stmt\n" if $Config{debug};
-
-  if (@row = $dbh->selectrow_array($stmt, undef, $hash{symbol})) {
-    # plausibility tests here
-    # someone might care to extend this to consider the 'active' tuple
-    # maybe if it's false that fact should be noted since
-    # the user has apparently seen fit to add it to the database (again)
-    print "ExistsInfoSymbol:@row\n" if $Config{debug};
-    return 1;    # perl truth is > 0
-  } else {
-    return 0;
+  if (!defined($_symExistsInfoSymbolSth)) {
+      $_symExistsInfoSymbolSth = $dbh->prepare(qq{select symbol from stockinfo
+						  where symbol = ?})
+	  or die $dbh->errstr;
   }
+  $_symExistsInfoSymbolSth->execute($hash{symbol})
+      or die $_symExistsInfoSymbolSth->errstr;
+  my @rows = $_symExistsInfoSymbolSth->fetchrow_array();
+  $_symExistsInfoSymbolSth->finish();
+
+  # plausibility tests here
+  # someone might care to extend this to consider the 'active' tuple
+  # maybe if it's false that fact should be noted since
+  # the user has apparently seen fit to add it to the database (again)
+  return (@rows > 0);
 }
 
 
-sub ExistsDailyData {
+sub ExistsDailyData($%) {
   my ($dbh, %hash) = @_;
-  my $stmt = qq{select previous_close, day_open, day_low, day_high,
-		       day_close, day_change, bid, ask, volume
-		from stockprices
-		where symbol = ?
-		and date     = ?
-	       };
-
-  print "ExistsDailyData():\n\$stmt = $stmt\n" if $Config{debug};
-
-  if (@row = $dbh->selectrow_array($stmt, undef, $hash{symbol}, $hash{date})) {
-    # plausibility tests here
-    return 1;
-  } else {
-    return 0;
+  if (!defined($_symExistsDailyDataSth)) {
+      $_symExistsDailyDataSth = $dbh->prepare(qq{select symbol from stockprices
+					where symbol = ? and date = ?})
+	  or die $dbh->errstr;
   }
+  $_symExistsDailyDataSth->execute($hash{symbol}, $hash{date})
+      or die $_symExistsDailyDataSth->errstr;
+  my @rows = $_symExistsDailyDataSth->fetchrow_array();
+  $_symExistsDailyDataSth->finish();
+  return (@rows > 0);
 }
 
 
@@ -1446,12 +1444,9 @@ sub ExistsFXDailyData {
 
   my $sth = $dbh->prepare($stmt);
   $sth->execute($fx,$hash{date});
-  if (@row = $sth->fetchrow_array()) {
-    # plausibility tests here
-    return 1;
-  } else {
-    return 0;
-  }
+  my @row = $sth->fetchrow_array();
+  $sth->finish();
+  return (@row > 0);
 }
 
 
@@ -1613,8 +1608,7 @@ sub ScrubDailyData {          # stuff the output into the hash
   foreach my $key (keys %hash) {# now check the date
     if ($hash{$key}{date} eq "N/A") { # if Yahoo! gave us no data
       if ($hash{$key}{symbol} =~ /^\^X/) { # and it was currency
-	my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
-	my $retry = $yahoo2iso->{$hash{$key}{symbol}} . "USD=X";
+	my $retry = GetIsoCurrency($hash{$key}{symbol}) . "USD=X";
 	my @retrysymbols;
 	push @retrysymbols, $retry;	
 	my (@newarr) = GetDailyData(@retrysymbols);
@@ -1732,8 +1726,6 @@ sub UpdateDatabase {		# update content in the db at end of day
 sub UpdateFXDatabase {
   my ($dbh, $res) = @_;
 
-  my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
-
   # get all non-USD symbols (no USD as we don't need a USD/USD rate)
   my $stmt = qq{  select distinct currency
 		  from portfolio 
@@ -1744,12 +1736,12 @@ sub UpdateFXDatabase {
 
   print "UpdateFXDatabase():\n\$stmt = $stmt\n" if $Config{debug};
 
-  my @symbols = map { $iso2yahoo->{$ARG} } @{ $dbh->selectcol_arrayref($stmt)};
+  my @symbols = map { GetYahooCurrency($ARG) } @{ $dbh->selectcol_arrayref($stmt)};
   print "UpdateFXDatabase(): Symbols are ", join(" ", @symbols), "\n" 
       if $Config{debug};
   if ($Config{extrafx}) {
     foreach my $arg (split /,/, $Config{extrafx}) {
-      push @symbols, $iso2yahoo->{$arg};	
+      push @symbols, GetYahooCurrency($arg);	
     }
   }
   if (scalar(@symbols) > 0) {	# if there are FX symbols
@@ -1817,6 +1809,7 @@ sub UpdateFXviaUBC {
 	my $sth = $dbh->prepare($stmt);
 	$sth->execute($fx, $data{date}, 1/$ubcfx->{$fx})
 	  or warn "Failed for $fx at $data{date}\n";
+	$sth->finish();
       }
     }
     if ($Config{commit}) {

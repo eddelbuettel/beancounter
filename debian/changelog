@@ -1,3 +1,23 @@
+beancounter (0.8.5) unstable; urgency=low
+
+  * Minor update and fixes thanks to a set of excellent patches 
+    contributed by Pieter du Preez:
+
+    o [BeanCounter.pm, beancounter]: Call finish() on all DBI statement
+      handles, and added some other Perl/SQL code improvement
+  
+    o [BeanCounter.pm, beancounter]: More undefined variable tests
+    
+    o [BeanCounter.pm]: Simplify and generalize DBI connection code
+
+    o [BeanCounter.pm]: Improve representation of currency code mapping
+
+    o [beancounter]: Correct second date in backpopulation example
+  
+    o [BeanCounter.pm]: Added checks for defined DBI statement handles 
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Wed, 15 Mar 2006 20:54:34 -0600
+
 beancounter (0.8.4) unstable; urgency=low
 
   * Minor updates and fixes:
