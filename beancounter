@@ -34,7 +34,7 @@ use Finance::BeanCounter;	# beancounter functions
 
 my $rcsversion = sprintf("%d.%d", q$Revision: 1.49 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.7.0";		# updated from the debian/rules Makefile
+my $version = "0.7.1";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
   sprintf("%s", q$Date: 2004/01/24 23:45:07 $ =~ /\w*: (\d*\/\d*\/\d*)/);

@@ -34,6 +34,14 @@ update:
 		$(srcdir)/setup_beancounter			\
 		$(srcdir)/update_beancounter			.
 
+        # update the $$version field in the perl code as well as in
+        # the two support scripts
+	perl -p -i -e \
+		"s/version = \".*\";/version = \""$(version)"\";/" $(package)
+	for i in setup_beancounter update_beancounter; do \
+	   perl -p -i -e "s/VERSION='.*'/VERSION='"$(version)"'/" $$i; \
+	done
+
 webdir:
 ifneq ($(host),sonny)
 		@echo "This needs to run on sonny"
@@ -67,14 +75,6 @@ endif
 build: build-stamp
 build-stamp:
 	dh_testdir
-
-        # update the $$version field in the perl code as well as in
-        # the two support script
-	perl -p -i -e \
-		"s/version = \".*\";/version = \""$(version)"\";/" $(package)
-	for i in setup_beancounter update_beancounter; do \
-	   perl -p -i -e "s/VERSION='.*'/VERSION='"$(version)"'/" $$i; \
-	done
         #$(PERL) Makefile.PL $(config)
 	perl Makefile.PL INSTALLDIRS=vendor	
 	pod2html --flush $(package) > $(package).html

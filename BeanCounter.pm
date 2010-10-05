@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.59 2004/01/24 23:47:42 edd Exp $
+#  $Id: BeanCounter.pm,v 1.60 2004/02/05 04:53:49 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.59 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.60 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -202,18 +202,17 @@ sub GetConfig {
 
   unless ( -f $file ) {
     warn "Config file $file not found, ignored.\n";
-    return %Config;
-  }
-
-  open (FILE, "<$file") or die "Cannot open $file: $!\n";
-  while (<FILE>) {
-    next if (m/(\#|%)/);	# ignore comments, if any
-    next if (m/^\s*$/);		# ignore empty lines, if any
-    if (m/^\s*(\w+)\s*=\s*(.+)\s*$/) {
-      $Config{$1} = "$2";
+  } else {
+    open (FILE, "<$file") or die "Cannot open $file: $!\n";
+    while (<FILE>) {
+      next if (m/(\#|%)/);	# ignore comments, if any
+      next if (m/^\s*$/);	# ignore empty lines, if any
+      if (m/^\s*(\w+)\s*=\s*(.+)\s*$/) {
+	$Config{$1} = "$2";
+      }
     }
+    close(FILE);
   }
-  close(FILE);
 
   $Config{currency} = $fx if defined($fx);
 

@@ -1,3 +1,12 @@
+beancounter (0.7.1) unstable; urgency=low
+
+  * Bug fix release:
+
+      - [BeanCounter.pm:] Don't return from GetConfig() when no per-user config file
+        is found but simply skip reading the file. 
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Wed,  4 Feb 2004 22:59:57 -0600
+
 beancounter (0.7.0) unstable; urgency=low
 
   * New release with the following new features:
