@@ -22,9 +22,12 @@ Ken Neighbors <ken@nsds.com>
 Martin Weulersse <martin@alpha.weulersse.de>
         for noticing a problem with the 'active' field under MySQL
 Bud Rogers <budr@sirinet.net>
-        for pointing out that datetime no longer worked for PostgreSQL 7.3.*
+        for pointing out that datetime no longer works for PostgreSQL 7.3.*
 Thomas Walter 
         for a bug report concerning a change in Yahoo!'s historical FX data
+	as well as for a fine patch correcting a logic error in the SQL code
+	in GetPriceData which affected the status report if securities had
+	multiple positions across portfolios
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 

@@ -1,3 +1,20 @@
+beancounter (0.6.4) unstable; urgency=low
+
+  * Bug fix release:
+
+      - BeanCounter.pm: Applied patch by Thomas Walter which corrects the SQL 
+        logic in GetPriceData that applies to restrictions covering stocks 
+        appearing in multiple portfolios, which can affect the status report.
+
+      - BeanCounter.pm: Applied another patch by Thomas Walter extending 
+        restrictions to other core functions, and adding debugging output
+  
+      - beancounter: Call GetCashData() later in portfolio_status()
+  
+      - beancounter: Corrected some formatting for reports
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Mon, 22 Dec 2003 19:58:53 -0600
+
 beancounter (0.6.3) unstable; urgency=low
 
   * Bug fix release:

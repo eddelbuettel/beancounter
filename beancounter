@@ -13,12 +13,12 @@
 #   but WITHOUT ANY WARRANTY; without even the implied warranty of
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
-# 
+#
 #   You should have received a copy of the GNU General Public License
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.43 2003/11/29 03:19:25 edd Exp $
+#   $Id: beancounter,v 1.46 2003/12/19 03:22:04 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -32,12 +32,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.43 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.46 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.6.1";		# updated from the debian/rules Makefile
+my $version = "0.6.4";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2003/11/29 03:19:25 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2003/12/19 03:22:04 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -321,8 +321,8 @@ sub display_status {
     $assetbase += $value;
 
     printf("%*s %s %3s %10.2f\n", 
-	   -16, substr($name,0,16), " " x 25, 
-	   $Config{currency}, 
+	   -16, substr($name,0,16), " " x 25,
+	   $Config{currency},
 	   $value,
 	  );
   }
@@ -350,7 +350,7 @@ sub display_riskreport {
   }
 
   my ($tl,$fl) = build_lines(79);
-  print "$tl\n" . "\t   Portfolio Risk on $pretty_date " .
+  print "$tl\n" . "            Portfolio Risk on $pretty_date " .
     "going back to $pretty_prev_date\n$fl\n";
   printf("%*s  %15s  %13s %10s %9s %8s\n%s\n",
 	 -16, "Name", "Position", "1% Profit/Loss", "Volatility", 
@@ -437,8 +437,9 @@ sub portfolio_retracement {
 
   my ($tl,$fl) = build_lines(79);
   my ($totaldown, $weightedup, $assetbase) = (0,0,0);
-  print "$tl\n" . "$text\t shares    price      value  $prev_date" .
-    " to $date  unreal. ";
+  print "$tl\n";
+  printf("%-18s", $text);
+  print "shares   price    value    $prev_date to $date  unreal. ";
   print "" . ($mode eq "advance") ? "gain" : "loss";
   print "\n$fl\n";
   foreach (sort keys %$prices) {
@@ -459,8 +460,8 @@ sub portfolio_retracement {
     $assetbase += $value{$ARG};
   }
   print "$fl\n";
-  printf("Aggregate\t\t\t %10.2f \t\t%8.2f%% %13.2f\n",  
-	 $assetbase,
+  printf("%-30s   %10.2f             %8.2f%% %13.2f\n",
+	 "Aggregate", $assetbase,
 	 100*$totaldown/$assetbase, $totaldown);
   print "$tl\n";
 }
@@ -501,13 +502,14 @@ sub portfolio_status {
   $date      = UnixDate(ParseDate($datearg),    "%Y%m%d") if ($datearg); 
   # create 'prettier' non-ISO 8601 form
   my $pretty_date = UnixDate(ParseDate($date), "%d %b %Y");
+
   my ($fx, $prices, $prev_prices, $shares, $pricedates, $cost, $pdate) = 
     GetPriceData($dbh,$date,$res);
 
-  my $cash = GetCashData($dbh, $date, $res);
-
   $fx->{'home currency'} = $Config{currency};
   my ($fx_prices)      = GetFXData($dbh, $date, $fx);
+
+  my $cash = GetCashData($dbh, $date, $res);
 
   display_status($date, $pretty_date, $prices, $pricedates,
 		 $fx_prices, $shares, $fx, $cost, $pdate, $cash);

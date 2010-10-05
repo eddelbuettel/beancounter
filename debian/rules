@@ -101,7 +101,7 @@ binary-indep: build
         #dh_suidregister
 	dh_installdeb
 	dh_gencontrol
-        #dh_md5sums
+	dh_md5sums
 	dh_builddeb
 
 binary-arch: build

@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.50 2003/11/29 03:20:35 edd Exp $
+#  $Id: BeanCounter.pm,v 1.55 2003/12/12 02:30:02 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.50 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.55 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -240,14 +240,20 @@ sub GetConfig {
 
 sub GetCashData {
   my ($dbh, $date, $res) = @_;
-
   my ($stmt, $sth, $rv, $ary_ref, $sym_ref, %cash);
   my ($name, $value, $fx, $cost);
   # get the symbols
   $stmt  = "select name, value, currency, cost from cash ";
   $stmt .= "where value > 0 ";
-  $stmt .= "and $res " if (defined($res));
+  $stmt .= "and $res " if (defined($res) and 
+			  (   grep("name", $res)
+			   or grep("value", $res)
+			   or grep("currency", $res)
+			   or grep("cost", $res)
+			   or grep("owner", $res)   ));
   $stmt .= "order by name";
+  print "GetCashData():\n\$stmt = $stmt\n" if $Config{debug};
+
   $sth = $dbh->prepare($stmt);
   $rv = $sth->execute(); 	# run query for report end date
   while (($name, $value, $fx, $cost) = $sth->fetchrow_array) {
@@ -332,7 +338,11 @@ sub GetPriceData {
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
   $stmt .= "order by p.symbol";
+  print "GetPriceData():\n\$stmt = $stmt\n" if $Config{debug};
+
+  # get symbols
   @symbols = @{ $dbh->selectcol_arrayref($stmt) };
+
   # for each symbol, get most recent date subject to supplied date
   $stmt  = qq{select max(date) 
 	      from stockprices 
@@ -340,6 +350,9 @@ sub GetPriceData {
 	      and day_close > 0
 	      and date <= ?
 	     };
+  print "GetPriceData():\n\$stmt = $stmt\n" if $Config{debug};
+
+  # for each symbol, get most recent date subject to supplied date:\n";
   $sth = $dbh->prepare($stmt);
   foreach $ra (@symbols) {	
     $rv = $sth->execute($ra, $date); # run query for report end date
@@ -357,9 +370,38 @@ sub GetPriceData {
 		and d.date = ?
 		and d.symbol = ?
 	       };
-  $stmt .= qq{and d.symbol in
+
+  #### TWA, 2003-12-04
+  ## According to the original code, here the restriction applies to the 
+  ## portfolio table only. But _note_:
+  ##   the same restriction is used in GetRiskData() !!!!
+  ##   the same restriction is used in GetRetracementData() !!!!
+  ## But it is not enough to restrict the symbols used by the sub-select 
+  ## command. One has to restrict the main selection with the same 
+  ## restriction rules.
+  ## Thus, make a copy of the restriction and replace the column names 
+  ## to a syntax to use the portfolio table only.
+  if (defined($res)) {
+    ## avoid name space pollution
+    my $portfolio_restriction = $res;
+
+    $portfolio_restriction =~ s/\bsymbol\b/p\.symbol/g;
+    $portfolio_restriction =~ s/\bshares\b/p\.shares/g;
+    $portfolio_restriction =~ s/\bcurrency\b/p\.currency/g;
+    $portfolio_restriction =~ s/\btype\b/p\.type/g;
+    $portfolio_restriction =~ s/\bowner\b/p\.owner/g;
+    $portfolio_restriction =~ s/\bcost\b/p\.cost/g;
+    $portfolio_restriction =~ s/\bdate\b/p\.date/g;
+
+    $stmt .= qq{ and $portfolio_restriction }
+  }				# end if (defined($res))
+
+  $stmt .= qq{ and d.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
+  print "GetPriceData():\n\$stmt = $stmt\n" if $Config{debug};
+
+  # now get closing price etc at date
   $sth = $dbh->prepare($stmt);
   my $i = 0;
   foreach $ra (@symbols) {		
@@ -381,8 +423,11 @@ sub GetPriceData {
       $shares{$name} = $shares;
     }
   }
+
   print Dumper(\%prices) if $Config{debug};
   print Dumper(\%prev_prices)  if $Config{debug};
+  print Dumper(\%shares) if $Config{debug};
+
   return (\%fx, \%prices, \%prev_prices, \%shares, \%pricedate, 
 	  \%cost, \%purchdate);
 }
@@ -394,6 +439,9 @@ sub GetFXData {
 		 where date = ?
 		 and currency = ?
 	       };
+
+  print "GetFXData():\n\$stmt = $stmt\n" if $Config{debug};
+
   my $sth = $dbh->prepare($stmt);
   my (%fx_prices,%prev_fx_prices);
   foreach my $fxval (sort values %$fx) {
@@ -403,7 +451,7 @@ sub GetFXData {
     } else {
       $sth->execute($date,$fxval);	# run query for FX cross
       my ($val,$prevval) = $sth->fetchrow_array
-	or die "Found no $fxval for $date in the beancounter database\n. " .
+	or die "Found no $fxval for $date in the beancounter database.\n " .
 	  "Use the --date and/or --prevdate options to pick another date.\n";
       $fx_prices{$fxval} = $val;
       $prev_fx_prices{$fxval} = $prevval;
@@ -459,10 +507,38 @@ sub GetRetracementData {
 		 from portfolio p, stockinfo i
 		 where p.symbol = i.symbol
 		 and i.active };
+
+  #### TWA, 2003-12-07
+  ## According to the original code, here the restriction applies to the 
+  ## portfolio table only. But _note_:
+  ##   the same restriction is used in GetPriceData() !!!!
+  ## But it is not enough to restrict the symbols used by the sub-select 
+  ## command. One has to restrict the main selection with the same 
+  ## restriction rules.
+  ## Thus, make a copy of the restriction and replace the column names 
+  ## to a syntax to use the portfolio table only.
+  if (defined($res)) {
+    ## avoid name space pollution
+    my $portfolio_restriction = $res;
+
+    $portfolio_restriction =~ s/\bsymbol\b/p\.symbol/g;
+    $portfolio_restriction =~ s/\bshares\b/p\.shares/g;
+    $portfolio_restriction =~ s/\bcurrency\b/p\.currency/g;
+    $portfolio_restriction =~ s/\btype\b/p\.type/g;
+    $portfolio_restriction =~ s/\bowner\b/p\.owner/g;
+    $portfolio_restriction =~ s/\bcost\b/p\.cost/g;
+    $portfolio_restriction =~ s/\bdate\b/p\.date/g;
+
+    $stmt .= qq{ and $portfolio_restriction }
+  }				# end if (defined($res))
+
   $stmt .= qq{and p.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
   $stmt .= "order by symbol";
+
+  print "GetRetracementData():\n\$stmt = $stmt\n" if $Config{debug};
+
   my $sth = $dbh->prepare($stmt);
   my $rv = $sth->execute(); 	# run query for report end date
   my $sref = $sth->fetchall_arrayref;
@@ -487,6 +563,9 @@ sub GetRetracementData {
 	      and day_close > 0
 	      order by date
 	     };
+
+  print "GetRetracementData():\n\$stmt = $stmt\n" if $Config{debug};
+
   $sth = $dbh->prepare($stmt);
   foreach my $ra (@$sref) {
     my $refdate = $prevdate;	# start from previous date
@@ -516,10 +595,38 @@ sub GetRiskData {
 		 from portfolio p, stockinfo i
 		 where p.symbol = i.symbol
 		 and i.active };
+
+  #### TWA, 2003-12-07
+  ## According to the original code, here the restriction applies to the 
+  ## portfolio table only. But _note_:
+  ##   the same restriction is used in GetPriceData() !!!!
+  ## But it is not enough to restrict the symbols used by the sub-select 
+  ## command. One has to restrict the main selection with the same 
+  ## restriction rules.
+  ## Thus, make a copy of the restriction and replace the column names 
+  ## to a syntax to use the portfolio table only.
+  if (defined($res)) {
+    ## avoid name space pollution
+    my $portfolio_restriction = $res;
+
+    $portfolio_restriction =~ s/\bsymbol\b/p\.symbol/g;
+    $portfolio_restriction =~ s/\bshares\b/p\.shares/g;
+    $portfolio_restriction =~ s/\bcurrency\b/p\.currency/g;
+    $portfolio_restriction =~ s/\btype\b/p\.type/g;
+    $portfolio_restriction =~ s/\bowner\b/p\.owner/g;
+    $portfolio_restriction =~ s/\bcost\b/p\.cost/g;
+    $portfolio_restriction =~ s/\bdate\b/p\.date/g;
+
+    $stmt .= qq{ and $portfolio_restriction }
+  }				# end if (defined($res))
+
   $stmt .= qq{and p.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
   $stmt .= "order by symbol";
+
+  print "GetRiskData():\n\$stmt = $stmt\n" if $Config{debug};
+
   my $sth = $dbh->prepare($stmt);
   my $rv = $sth->execute(); 	# run query for report end date
   my $sref = $sth->fetchall_arrayref;
@@ -533,6 +640,9 @@ sub GetRiskData {
 	      and day_close > 0
 	      order by date
 	     };
+
+  print "GetRiskData():\n\$stmt = $stmt\n" if $Config{debug};
+
   $sth = $dbh->prepare($stmt);
   my (%vol, %quintile);
   foreach my $ra (@$sref) {
@@ -565,6 +675,9 @@ sub GetRiskData {
 	      and b.day_close != 0 
 	      order by a.date
 	     };
+
+  print "GetRiskData():\n\$stmt = $stmt\n" if $Config{debug};
+
   $sth = $dbh->prepare($stmt);
   my %cor;
   foreach my $ra (@$sref) {		
@@ -604,6 +717,9 @@ sub GetRiskData {
 	      where symbol = ? 
 	      and date <= ?
 	     };
+
+  print "GetRiskData():\n\$stmt = $stmt\n" if $Config{debug};
+
   $sth = $dbh->prepare($stmt);
   foreach my $ra (@$sref) {		
     $rv = $sth->execute($ra->[0], $date); # run query for report end date
@@ -624,6 +740,9 @@ sub GetRiskData {
   $stmt .= qq{and d.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
+
+  print "GetRiskData():\n\$stmt = $stmt\n" if $Config{debug};
+
   $sth = $dbh->prepare($stmt);
   foreach my $ra (@$sref) {		
     $rv = $sth->execute($maxdate{$ra->[1]}, $ra->[0]); 
@@ -734,6 +853,9 @@ sub DatabaseFXDailyData {
                  where currency        = ?
                    and date            = ?
                 };
+
+      print "DatabaseFXDailyData():\n\$stmt = $stmt\n" if $Config{debug};
+
       $dbh->do($stmt, undef, $hash{$key}{previous_close},
 	       $hash{$key}{day_open},
 	       $hash{$key}{day_low},
@@ -746,6 +868,9 @@ sub DatabaseFXDailyData {
 	or warn "Failed for $fx at $hash{$key}{date}\n";
     } else {
       my $stmt = qq{insert into fxprices values (?, ?, ?, ?, ?, ?, ?, ?);};
+
+      print "DatabaseFXDailyData():\n\$stmt = $stmt\n" if $Config{debug};
+
       my $sth = $dbh->prepare($stmt);
       $sth->execute($fx,
 		    $hash{$key}{date},
@@ -937,6 +1062,9 @@ sub ExistsDailyData {
 		where symbol = ?
 		and date     = ?
 	       };
+
+  print "ExistsDailyData():\n\$stmt = $stmt\n" if $Config{debug};
+
   if (@row = $dbh->selectrow_array($stmt, undef, $hash{symbol}, $hash{date})) {
     # plausibility tests here
     return 1;
@@ -953,6 +1081,9 @@ sub ExistsFXDailyData {
                 where currency = ?
                   and date     = ?
               };
+
+  print "ExistsFXDailyData():\n\$stmt = $stmt\n" if $Config{debug};
+
   my $sth = $dbh->prepare($stmt);
   $sth->execute($fx,$hash{date});
   if (@row = $sth->fetchrow_array()) {
@@ -1170,8 +1301,9 @@ sub UpdateDatabase {		# update content in the db at end of day
 			        from portfolio where $res)
 	     } if defined($res);
   $stmt .= " order by symbol;";
-  
-  print "$stmt\n" if $Config{debug};
+
+  print "UpdateDatabase():\n\$stmt = $stmt\n" if $Config{debug};
+
   @symbols = @{ $dbh->selectcol_arrayref($stmt) };
   print join " ", @symbols, "\n" if $Config{verbose};
 
@@ -1197,6 +1329,9 @@ sub UpdateFXDatabase {
 		  and currency != 'USD'
 	    };
   $stmt .= "   and $res " if (defined($res));
+
+  print "UpdateFXDatabase():\n\$stmt = $stmt\n" if $Config{debug};
+
   my @symbols = map { $iso2yahoo->{$ARG} } @{ $dbh->selectcol_arrayref($stmt)};
   if ($Config{extrafx}) {
     foreach my $arg (split /,/, $Config{extrafx}) {
