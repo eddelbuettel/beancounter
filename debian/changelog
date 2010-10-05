@@ -1,3 +1,24 @@
+beancounter (0.7.3) unstable; urgency=low
+
+  * Bug fix release:
+
+    - [BeanCounter.pm] For backpopulation of foreign exchange data, divide
+      all data with dates past Dec 30, 2003, by a factor of 100.0 to account
+      for Yahoo's change from a 'dollars' to 'cents' scale.
+  
+    - [BeanCounter.pm] For backpopulation of prices and fx series, skip over
+      the newly added html comment line Yahoo! decided to throw in there. 
+      Thanks to Robert A. Schmied for the heads-up on this.
+  
+    - [Makefile.PL] Be less restrictive and require onky DBI; as any one of  
+      four DBD modules could be used, it makes no sense to impose on (Pg) on
+      everybody.
+  
+    - [debian/rules] Integrated 'perl Makefile.PL; make dist' needed for
+      proper CPAN uploads into the normal 'update' from the my sources
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Sat,  3 Apr 2004 09:52:11 -0600
+
 beancounter (0.7.2) unstable; urgency=low
 
   * Bug fix release:

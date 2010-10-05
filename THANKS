@@ -32,9 +32,9 @@ Robert A. Schmied
         for a thoughtful set of patches to beancounter, BeanCounter.pm
 	setup_beancounter and update_beancounter. First Grand Slam winner :)
 Mike Castle
-        for a patch with more consistent upper/lower case of BeanCounter
+        for a patch with more consistent upper/lower case use in BeanCounter
 Joao Pedro
-        for pointing out that password should be passwd in example.beancounterrc
+        for noting that password should be passwd in example.beancounterrc
 Phil Homewood
         for a patch dealing with 'times 100' scaling in FX rates 
 

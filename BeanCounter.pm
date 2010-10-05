@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.62 2004/03/02 22:41:20 edd Exp $
+#  $Id: BeanCounter.pm,v 1.63 2004/04/03 04:41:15 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.62 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.63 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -897,6 +897,7 @@ sub DatabaseHistoricalData {
   my %data;			# hash to store data of various completenesses
   $symbol = uc $symbol;		# make sure symbols are uppercase'd
   foreach $ARG (@res) {		# loop over all supplied symbols
+    next if m/^<\!-- .*-->/;    # skip lines with html comments (April 2004)
     # make sure the first line of data is correct so we don't insert garbage
     if ($checked==0 and m/Date(,Open,High,Low)?,Close(,Volume)?/) {
       $checked = tr/,//;
@@ -972,9 +973,12 @@ sub DatabaseHistoricalFXData {
   my $checked = 0;		# flag to ensure not nonsensical or errors
   my %data;			# hash to store data of various completenesses
 
+  my $cut = UnixDate(ParseDate("30-Dec-2003"), "%Y%m%d");
+
   my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
   my $fx = $yahoo2iso->{$symbol};
   foreach $ARG (@res) {		# loop over all supplied symbols
+    next if m/^<\!-- .*-->/;    # skip lines with html comments (April 2004)
     # make sure the first line of data is correct so we don't insert garbage
     if ($checked==0 and m/Date(,Open,High,Low)?,Close(,Volume)?/) {
       $checked = tr/,//;
@@ -994,6 +998,13 @@ sub DatabaseHistoricalFXData {
 		 volume    => undef); # never any volume info for FX
       } else {			# no volume for indices
 	print "Unknown currency format: $ARG\n";
+      }
+
+      if (Date_Cmp($date,$cut) >= 0) { # if date if on or after cutoff date
+	$data{day_open}  /= 100.0;     # then scale by a hundred to match the
+	$data{day_low}   /= 100.0;     # old level "in dollars" rather than the
+	$data{day_high}  /= 100.0;     # new one "in cents"
+	$data{day_close} /= 100.0;
       }
 
       # now given the data, decide whether we add new data or update old data
@@ -1167,6 +1178,7 @@ sub PrintHistoricalData {	# simple display routine for hist. data
   my (@res) = @_;
   my $i=1;
   foreach $ARG (@res) {
+    next if m/^<\!-- .*-->/;    # skip lines with html comments (April 2004)
     print $i++, ": $ARG\n";
   }
 }

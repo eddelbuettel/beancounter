@@ -1,0 +1,20 @@
+beancounter
+BeanCounter.pm
+beancounter_schema_mysql.txt
+beancounter_schema_postgresql.txt
+beancounter_schema_sqlite.txt
+beancounter.spec
+beancounter_example.txt
+example.beancounterrc
+flip_symbol.sh
+Makefile.PL
+MANIFEST
+README
+README.Debian
+README.non-gnu
+setup_beancounter
+THANKS
+TODO
+update_beancounter
+t/01base.t
+META.yml                                 Module meta-data (added by MakeMaker)
