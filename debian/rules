@@ -1,7 +1,7 @@
 #! /usr/bin/make -f
 #                                                       -*- makefile -*-
 # debian/rules file for the Debian/GNU Linux beancounter package
-# Copyright (C) 2001 - 2006 by Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2001 - 2007 by Dirk Eddelbuettel <edd@debian.org>
 
 package	:= $(shell grep Package debian/control | sed 's/^Package: //')
 version	:= $(shell head -1 debian/changelog | \
@@ -15,12 +15,10 @@ host	:= $(shell hostname)
 
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
-export DH_COMPAT=5
-
 
 update:
-ifneq ($(host),chibud)
-		@echo "This needs to run on chibud"
+ifneq ($(host),ron)
+		@echo "This needs to run on ron"
 		false
 endif
 	cp -vaf	$(srcdir)/BeanCounter.pm 			\
@@ -40,7 +38,7 @@ endif
 		$(srcdir)/update_beancounter			\
 		$(srcdir)/contrib/				\
 		$(srcdir)/t/					.
-	@echo "********* Now run updatebuild on basebud"
+	@echo "********* Now run updatebuild on ron"
 
 updatebuild:
         # update the $$version field in the perl code as well as in
@@ -58,11 +56,11 @@ updatebuild:
 	mv -v Finance-BeanCounter-$(version).tar.gz ..
 
 webdir:
-ifneq ($(host),basebud)
-		@echo "This needs to run on basebud"
+ifneq ($(host),ron)
+		@echo "This needs to run on ron"
 		false
 endif
-	cp -vax /var/local/cache/pbuilder/result/$(package)_$(version)_all.deb ..
+	cp -vax /var/cache/pbuilder/result/$(package)_$(version)_all.deb ..
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
 		cd /tmp; \
 		fakeroot alien -r $(package)_$(version)_all.deb; \

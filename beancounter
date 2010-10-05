@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.87 2006/03/08 03:55:29 edd Exp $
+#   $Id: beancounter,v 1.88 2007/10/04 03:22:57 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -34,12 +34,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.87 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.88 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.7";		# updated from the debian/rules Makefile
+my $version = "0.8.8";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2006/03/08 03:55:29 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2007/10/04 03:22:57 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -333,7 +333,7 @@ sub display_status {
     my ($daysheld,$return) = ("", "");
     if (defined($pdate->{$name})) { # if we have a purchase date
       $daysheld = Delta_Format(DateCalc($pdate->{$name}, $date,
-					undef, 2), 0, "%dt");
+					undef, 2), "approx", 0, "%dt");
       if (defined($cost->{$name}) and $daysheld >= 0) {
  	$return = ($prices->{$name} / $cost->{$name} - 1) 
 	  * 100 * Sign($totalshares{$name});
@@ -403,7 +403,7 @@ sub display_longstatus {
     my ($daysheld,$return,$fxthen,$fxnow) = ("", "", 1.0, 1.0);
     if (defined($pdate->{$key})) { # if we have a purchase date
       $daysheld = Delta_Format(DateCalc($pdate->{$key}, $date,
-					undef, 2), 0, "%dt");
+					undef, 2), "approx", 0, "%dt");
       if (defined($cost->{$key}) and $daysheld >= 0 and $cost->{$key} != 0) {
 	if ($fx->{$name} ne $Config{currency}) {
 	  $fxthen = GetFXDatum($dbh, $pdate->{$key}, $fx->{$name});
@@ -726,7 +726,7 @@ sub portfolio_retracement {
     unless (Date_Cmp(ParseDate($prevdatearg), ParseDate($datearg)) < 0);
   die "Error: '$prevdatearg' is not at least 30 days prior to '$datearg'.\n"
     unless (Delta_Format(DateCalc(ParseDate($prevdatearg), ParseDate($datearg),
-				  undef, 2), 0, "%dt") > 30);
+				  undef, 2), "approx", 0, "%dt") > 30);
 
   my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
     = GetTodaysAndPreviousDates();
@@ -792,7 +792,7 @@ sub portfolio_risk {
     unless (Date_Cmp(ParseDate($prevdatearg), ParseDate($datearg)) < 0);
   die "Error: '$prevdatearg' is not at least 30 days prior to '$datearg'.\n"
     unless (Delta_Format(DateCalc(ParseDate($prevdatearg), ParseDate($datearg),
-				  undef, 2), 0, "%dt") > 30);
+				  undef, 2), "approx", 0, "%dt") > 30);
 
   my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
     = GetTodaysAndPreviousDates();

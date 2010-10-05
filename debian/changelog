@@ -1,3 +1,14 @@
+beancounter (0.8.8) unstable; urgency=low
+
+  * Minor bugfix releases:
+
+    o [beancounter, BeanCounter.pm]: Add "approx" as third argument
+      to the call of Delta_Format() which seems to be needed now 
+
+  * debian/control: Standards-Version: increased to 3.7.2
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Wed, 03 Oct 2007 22:24:56 -0500
+
 beancounter (0.8.7) unstable; urgency=low
 
   * Minor bugfix releases:

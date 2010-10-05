@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.102 2006/04/22 04:03:03 edd Exp $
+#  $Id: BeanCounter.pm,v 1.103 2007/10/04 03:23:25 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -75,7 +75,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.102 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.103 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -1646,7 +1646,7 @@ sub ScrubDailyData {          # stuff the output into the hash
     if ($hash{$key}{date} ne $Config{today}) {   # if date is not today
 
       my $age = Delta_Format(DateCalc($hash{$key}{date}, $Config{lastbizday},
-				      undef, 2), 0, "%dt");
+				      undef, 2), "approx", 0, "%dt");
       if ($age > 5) {
         warn "Ignoring $hash{$key}{symbol} ($hash{$key}{name}) " .
 	  "with old date $hash{$key}{date}\n";
