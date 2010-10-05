@@ -1,7 +1,7 @@
 #
 #  BeanCounter.pm --- A stock portfolio performance monitoring toolkit
 #
-#  Copyright (C) 1998 - 2002  Dirk Eddelbuettel <edd@debian.org>
+#  Copyright (C) 1998 - 2003  Dirk Eddelbuettel <edd@debian.org>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.45 2002/12/31 03:37:36 edd Exp $
+#  $Id: BeanCounter.pm,v 1.49 2003/04/26 21:54:01 edd Exp edd $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.45 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.49 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -110,19 +110,27 @@ sub CloseDB {
   $dbh->disconnect;
 }
 
+sub ConvertVersionToLargeInteger($) {
+  my ($txt) = @_;
+  my ($major,$minor,$revision) = ($txt =~ m/^([0-9]+)\.([0-9]+)\.([0-9]+)$/);
+  my $numeric = $major * 1e6 + $minor * 1e3 + $revision;
+  #print "[$txt] -> [$major] [$minor] [$revision] -> $numeric\n";
+  return($numeric);
+}
+
 sub TestInsufficientDatabaseSchema($$) {
-  my ($dbh, $version) = @_;
+  my ($dbh, $required) = @_;
   my @tables = $dbh->tables();
   die "Database does not contain table beancounter. " .
     "Please run 'update_beancounter'.\n" unless grep /beancounter/, @tables;
   my $sql = q{select version from beancounter};
   my @res = $dbh->selectrow_array($sql) or die $dbh->errstr;
-  my $schema = $res[0];
-  $version =~ s/\.//g;		# raw hack on the 0.1.2 => 012 version
-  $schema =~ s/\.//g;		# should be more general ...
-  print "Database has schema $schema. requiring at least $version\n" 
+  my $dbschema = $res[0];
+  my $num_required = ConvertVersionToLargeInteger($required);
+  my $num_schema = ConvertVersionToLargeInteger($dbschema);
+  print "Database has schema $dbschema, we require version $required\n" 
     if $Config{debug};
-  return ($version lt $schema);
+  return ($num_schema < $num_required); # extensive testing was required =:-)
 }
 
 sub GetTodaysAndPreviousDates {
@@ -258,7 +266,7 @@ sub GetDailyData {		# use Finance::YahooQuote::getquote
   #my $array = GetQuote($url,@NA); # get all North American quotes
   my $array = getquote(@Args);	# get North American quotes
   push @Res, (@$array);	# and store the entire array of arrays 
-  
+
   print Dumper(\@Res) if $Config{debug};
   return @Res;
 }
@@ -394,7 +402,8 @@ sub GetFXData {
     } else {
       $sth->execute($date,$fxval);	# run query for FX cross
       my ($val,$prevval) = $sth->fetchrow_array
-	or die "Could not fetch $fxval for $date\n";
+	or die "Found no $fxval for $date in the beancounter database\n. " .
+	  "Use the --date and/or --prevdate options to pick another date.\n";
       $fx_prices{$fxval} = $val;
       $prev_fx_prices{$fxval} = $prevval;
       my $ary_ref = $sth->fetchall_arrayref;
@@ -909,7 +918,7 @@ sub DatabaseInfoData {		# initialise a row in the info table
 	      "  $hash{$key}{dividend_per_share}," .
 	      "  $hash{$key}{price_earnings_ratio}," .
 	      "  $hash{$key}{average_volume}," .
-              "  't')";
+              "  '1')";
     $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
     print "$cmd\n" if $Config{debug};
     print "$hash{$key}{symbol} " if $Config{verbose};

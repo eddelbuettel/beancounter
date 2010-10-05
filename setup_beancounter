@@ -2,7 +2,7 @@
 #
 #   setup_beancounter --- Example usage of the beancounter tool
 #  
-#   Copyright (C) 2000, 2001  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 2000 - 2003  Dirk Eddelbuettel <edd@debian.org>
 #  
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.21 2002/12/30 01:59:28 edd Exp $
+#   $Id: setup_beancounter,v 1.25 2003/04/26 02:42:51 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -42,7 +42,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.6.0'
+VERSION='0.6.2'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'
@@ -139,7 +139,7 @@ function create_mysql_tables()
 	dividend float default NULL,
 	p_e_ratio float default NULL,
 	avg_volume int(11) default NULL,
-	active bool default 1,
+	active bool default '1',
 	PRIMARY KEY (symbol)
     ) TYPE=MyISAM;
 
@@ -178,7 +178,7 @@ function create_postgres_tables()
 
 	create table beancounter (
 	    version		varchar(12) not null,
-   	    data_last_updated	datetime
+   	    data_last_updated	timestamp with time zone
 	);
 	insert into beancounter values('$VERSION', 'now');
 
@@ -345,7 +345,7 @@ function exit_if_no_mysql_user()
 	echo ""
 	echo "    Change to super user (MySQL Admin):   $ su -"
 	echo "    Start mysql program with mysql db:    # mysql mysql"
-	echo "    Create the user:       grant all privileges on *.* to $user@localhost;"
+	echo "    Create the user:       grant all privileges on *.* to $USER@localhost;"
 	echo "    Exit from user mysql:                 > \q"
 	echo "    Exit from super user:                 # exit"
 	echo ""

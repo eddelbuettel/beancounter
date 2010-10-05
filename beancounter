@@ -18,11 +18,10 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.37 2002/12/28 20:22:40 edd Exp $
+#   $Id: beancounter,v 1.42 2003/04/26 21:50:30 edd Exp edd $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
-
 use strict;			# be careful out there, son
 use Date::Manip;		# general date parsing / calcs
 use English;			# explicit variable names
@@ -33,11 +32,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.37 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.42 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.6.0";		# updated from the debian/rules Makefile
+my $version = "0.6.2";		# updated from the debian/rules Makefile
+my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2002/12/28 20:22:40 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2003/04/26 21:50:30 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -67,7 +67,7 @@ my %Config = GetConfig($rcfile, $debug, $verbose, $fxarg,
 		       $fxupdate, $command);
 my $dbh = ConnectToDb();
 
-if (TestInsufficientDatabaseSchema($dbh, $version)) {
+if (TestInsufficientDatabaseSchema($dbh, $db_min_schema)) {
   warn "Database schema is not current. Please run 'update_beancounter'\n";
 } else {
   if ($command =~ /^plreport$/) {
@@ -560,7 +560,7 @@ sub backpopulate {
     # we need to query the DB to see if this symbol was registered
     my $stmt = qq{ select symbol from stockinfo where symbol = ? };
     my $sth = $dbh->prepare($stmt);
-    my $rv = $sth->execute($symbol);
+    my $rv = $sth->execute(uc $symbol);
     while (my $r = $sth->fetch) {
       print "   adding $r->[0] from $fromdate to $todate\n";
       my @arr = GetHistoricalData($r->[0], $fromdate, $todate);
@@ -645,7 +645,8 @@ sub add_portfolio {
       = (undef, undef, undef, undef, undef);
     print "Inserting $arg\n" if $Config{verbose};
     ($stock,$nb,$fx,$type,$owner,$cost,$date) = split /:/, $arg;
-    $fx = $Config{currency} unless defined($fx); 
+    $stock = uc $stock;		# uppercase it
+    $fx = $Config{currency} unless defined($fx);
     if (defined($stock) and defined($nb)) {
       $sth->execute($stock, $nb, $fx, $type, $owner, $cost, $date);
       $dbh->commit();		# the ODBC driver needs that for a weird reason
@@ -655,12 +656,13 @@ sub add_portfolio {
 
     $infosth->execute($stock);
     push @symbol, $stock unless ($infosth->fetch);
-
   }
   $sth->finish;
   $infosth->finish;
 
-  add_stock(@symbol)		# make sure 'new' stocks get added to DB
+  if ($#symbol > -1) {		# if there are symbols to be added
+    add_stock(@symbol)		# make sure 'new' stocks get added to DB
+  }
 }
 
 

@@ -1,3 +1,26 @@
+beancounter (0.6.2) unstable; urgency=low
+
+  * Bug fix release:
+  
+      - BeanCounter.pm, setup_beancounter, update_beancounter: 
+        Default value of active field changed from 't' to '1'
+  
+      - BeanCounter.pm: DB Schema comparison now based on numeric value
+  
+      - BeanCounter.pm: If no FX data found, suggest --date/--prevdate option
+  
+      - beancounter: Add uppercase'd symbol to portfolio
+  
+      - beancounter, setup_beancounter, update_beancounter: 
+        Use distinct version number for db schema comparison
+
+      - setup_beancounter, update_beancounter: 
+        Use 'timestamp with time zone' for beancounter when PostgreSQL is used
+  
+      - setup_beancounter: Use $USER, not $user, for error message
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Tue,  6 May 2003 21:16:52 -0500
+
 beancounter (0.6.1) unstable; urgency=low
 
   * Bug fix release:
