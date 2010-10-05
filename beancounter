@@ -34,7 +34,7 @@ use vars qw($help $debug $verbose $datearg $prevdatearg
 
 use Finance::BeanCounter;
 
-my $version = "0.1.0";		# updated from the debian/rules Makefile
+my $version = "0.1.1";		# updated from the debian/rules Makefile
 my $date =			# inner expression updated by RCS
   sprintf("%s", q$Date: 2000/07/24 03:36:35 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 

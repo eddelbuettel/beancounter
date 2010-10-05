@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.5 2000/07/24 03:36:08 edd Exp $
+#  $Id: BeanCounter.pm,v 1.6 2000/07/26 02:45:50 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -58,7 +58,7 @@ use Text::ParseWords;		# parse .csv files more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.5 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.6 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -438,7 +438,7 @@ sub DatabaseInfoData {		# update a row in the info table
 	      "$hash{$key}{price_earnings_ratio}," .
 	      "$hash{$key}{average_volume})";
     $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
-    print "$cmd\n" if $Config{$debug};
+    print "$cmd\n" if $Config{debug};
     print "$hash{symbol} " if $Config{verbose};
     $dbh->do($cmd) or croak $dbh->errstr;
   }

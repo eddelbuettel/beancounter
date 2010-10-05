@@ -32,7 +32,7 @@ build-stamp:
 	dh_testdir
 	$(PERL) Makefile.PL $(config)
 	pod2html --flush $(package) > $(package).html
-	pod2man          $(package) > $(package).1
+#	pod2man          $(package) > $(package).1
 	$(MAKE)
 	# update the $$version field in the perl code
 	perl -p -i -e \
@@ -53,10 +53,8 @@ binary-indep: build
 	dh_testroot
 	dh_clean -k
 #	dh_installdirs		usr/bin usr/share/man/man1
-	dh_installdirs		usr/bin 
-#	$(MAKE) 		pure_install
+#	dh_installdirs		usr/bin 
 	$(MAKE) 		prefix=$(debtmp)/usr pure_install
-#	install beancounter $(debtmp)/usr/bin
 	dh_perl	
 	dh_installdocs		
 #	dh_installexamples	setup_beancounter 

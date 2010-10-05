@@ -1,3 +1,11 @@
+beancounter (0.1.1) unstable; urgency=low
+
+  * Bugfix release:
+  * BeanCounter.pm: corrected minor typo in DatabaseInfoData
+  * debian/rules: don't create beancounter.1 -- Makefile.PL does that too
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Tue, 25 Jul 2000 22:47:40 -0400
+
 beancounter (0.1.0) unstable; urgency=low
 
   * Initial Debian (and upstream) release.
