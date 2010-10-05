@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.101 2006/03/22 04:16:28 edd Exp $
+#  $Id: BeanCounter.pm,v 1.102 2006/04/22 04:03:03 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -75,7 +75,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.101 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.102 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -1230,6 +1230,7 @@ sub DatabaseHistoricalData {
 	$data{day_open} *= $split_adj;
 	$data{day_high} *= $split_adj;
 	$data{day_low}  *= $split_adj;
+	$data{day_close} = $data{adjclose};
       }
 
       if (ExistsDailyData($dbh, %data)) {

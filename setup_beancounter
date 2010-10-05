@@ -53,7 +53,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.8.6'
+VERSION='0.8.7'
 DBSYSTEM='PostgreSQL'
 #DBSYSTEM='MySQL'
 SCHEMA_ONLY=0

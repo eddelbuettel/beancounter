@@ -1,17 +1,16 @@
-
 %define perl_vendorlib %(eval "`perl -V:installvendorlib`"; echo $installvendorlib)
 %define perl_vendorarch %(eval "`perl -V:installvendorarch`"; echo $installvendorarch)
 
 Summary:     BeanCounter portfolio performance toolkit
 Name:        beancounter
-Version:     0.7.6
+Version:     0.8.6
 Release:     1
-Copyright:   GNU GPL
+License:     GNU GPL
 Group:       Applications/Finance
 BuildRoot:   /var/tmp/build-rpm
 URL:	     http://dirk.eddelbuettel.com/code/beancounter.html
 
-Source:      http://dirk.eddelbuettel.com/code/beancounter/beancounter_%{version}.tar.gz
+Source:      http://dirk.eddelbuettel.com/code/beancounter/beancounter-%{version}.tar.gz
 
 Requires:    perl-Statistics-Descriptive
 

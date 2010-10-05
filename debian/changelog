@@ -1,3 +1,15 @@
+beancounter (0.8.7) unstable; urgency=low
+
+  * Minor bugfix releases:
+
+    o [BeanCounter.pm]: Also adjust close for splits in backpopulation
+  
+    o [contrib/beancounter.spec]: New version contributed by Doug Laidlaw
+
+  * debian/control: Standards-Version: increased to 3.7.0, no changes needed
+    
+ -- Dirk Eddelbuettel <edd@debian.org>  Tue,  2 May 2006 22:04:13 -0500
+
 beancounter (0.8.6) unstable; urgency=low
 
   * Minor bugfix releases:

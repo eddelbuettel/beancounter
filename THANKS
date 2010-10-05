@@ -52,6 +52,10 @@ Rene Cunningham
         for a patch to prevent a division-by-zero if adjusted close was zero
 Pieter du Preez
         for a very comprehensive patch set that improved my code a lot
+Jesse Chu
+        for noticing that closes weren't set to adj closes in backpopulating
+Doug Laidlaw
+        for an updated rpm spec file
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 

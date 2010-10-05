@@ -8,7 +8,7 @@ version	:= $(shell head -1 debian/changelog | \
 			perl -nle 'm/\S+\s+\((\S+)\)/ && print $$1')
 debtmp	:= $(shell pwd)/debian/$(package)
 
-srcdir  := /home/edd/.chibud/src/progs/perl/beancounter
+srcdir  := ../../../progs/perl/beancounter
 webdir  := /home/edd/www/code/beancounter
 
 host	:= $(shell hostname)
@@ -17,7 +17,12 @@ host	:= $(shell hostname)
 #export DH_VERBOSE=1
 export DH_COMPAT=5
 
+
 update:
+ifneq ($(host),chibud)
+		@echo "This needs to run on chibud"
+		false
+endif
 	cp -vaf	$(srcdir)/BeanCounter.pm 			\
 		$(srcdir)/beancounter 				\
 		$(srcdir)/README 				\
@@ -35,7 +40,9 @@ update:
 		$(srcdir)/update_beancounter			\
 		$(srcdir)/contrib/				\
 		$(srcdir)/t/					.
+	@echo "********* Now run updatebuild on basebud"
 
+updatebuild:
         # update the $$version field in the perl code as well as in
         # the two support scripts
 	perl -p -i -e \
@@ -43,10 +50,6 @@ update:
 	for i in setup_beancounter update_beancounter; do \
 	   perl -p -i -e "s/VERSION='.*'/VERSION='"$(version)"'/" $$i; \
 	done
-	perl Makefile.PL
-	make 
-
-perlrelease:
 	perl -p -i -e \
 	   "s/'VERSION'	\t=> '\d.\d.\d'/'VERSION'\t\t=> '"$(version)"'/"\
 		Makefile.PL 
