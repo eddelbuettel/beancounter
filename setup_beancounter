@@ -2,7 +2,7 @@
 #
 #   setup_beancounter --- Example usage of the beancounter tool
 #  
-#   Copyright (C) 2000 - 2003  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 2000 - 2004  Dirk Eddelbuettel <edd@debian.org>
 #  
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.25 2003/04/26 02:42:51 edd Exp $
+#   $Id: setup_beancounter,v 1.27 2004/01/22 01:02:42 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -42,7 +42,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.6.4'
+VERSION='0.5.0'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'
@@ -67,7 +67,7 @@ DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MR
 # (NB that Canadian stocks need a .TO suffix, eg Air Canada becomes AC.TO)
 
 # --------------------------- shell functions below --------------------------
-function usage_and_exit()
+function usage_and_exit
 {
     cat<<EOF
 Created (and fill) database tables for beancounter
@@ -81,7 +81,7 @@ EOF
     exit 0
 }
 
-function execute()
+function execute
 {
     echo -n "** Running:     "
     echo "$1"
@@ -90,7 +90,7 @@ function execute()
 }
 
 
-function create_mysql_tables()
+function create_mysql_tables
 {
     echo | $DBCOMMAND $DATABASE <<EOF 
 
@@ -172,7 +172,7 @@ function create_mysql_tables()
 EOF
 }
 
-function create_postgres_tables()
+function create_postgres_tables
 {
     echo | $DBCOMMAND $DATABASE <<EOF 
 
@@ -259,7 +259,7 @@ function create_postgres_tables()
 EOF
 }
 
-function exit_if_exists()
+function exit_if_exists
 {
     set +e
     if [ "$DBSYSTEM" = "MySQL" ]
@@ -287,7 +287,7 @@ function exit_if_exists()
     fi
 }
 
-function exit_if_root()
+function exit_if_root
 {
     if [ "$1" == "root" ]
     then
@@ -304,7 +304,7 @@ function exit_if_root()
     fi
 }
 
-function exit_if_no_postgres_user()
+function exit_if_no_postgres_user
 {
     set +e
     ( $DBCOMMAND template1 -c "select * from pg_user;" | grep $1 ) \
@@ -330,7 +330,7 @@ function exit_if_no_postgres_user()
     set -e
 }
 
-function exit_if_no_mysql_user()
+function exit_if_no_mysql_user
 {
     set +e
     ( echo "select user from user;" | \

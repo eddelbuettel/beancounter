@@ -1,3 +1,26 @@
+beancounter (0.6.5) unstable; urgency=low
+
+  * Bug fix releases with patches from Robert A. Schmied:
+  
+      - beancounter: Render display_report a little more robust, 
+        typo correction for Advancement
+
+      - BeanCounter.pm: More explicit warning messages in ScrubDailyData;
+        corrected a test to ensure volume is store too on backpopulation
+  
+      - updates_beancounter, setup_beancounter: Removes superfluous empty
+        parantheses at the end of function defintions for ksh compatibiliy
+  
+  * New documentation files added just in case:
+
+      - beancounter_example.txt (from running 'setup_beancounter')
+  
+      - beancounter_schema_postgresql.txt (output from 'pgdump --schema-only')
+
+      - beancounter_schema_mysql.txt (output from 'mysqladmin --no-data')
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Thu, 22 Jan 2004 21:59:36 -0600
+
 beancounter (0.6.4) unstable; urgency=low
 
   * Bug fix release:

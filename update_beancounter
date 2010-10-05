@@ -2,7 +2,7 @@
 #
 #   update_beancounter --- Modify beancounter database
 #  
-#   Copyright (C) 2000 - 2002  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 2000 - 2004  Dirk Eddelbuettel <edd@debian.org>
 #  
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: update_beancounter,v 1.13 2003/05/04 21:42:57 edd Exp $
+#   $Id: update_beancounter,v 1.15 2004/01/22 01:02:20 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -32,7 +32,7 @@ then
     USER=$(whoami)
 fi
 
-VERSION='0.6.4'
+VERSION='0.6.0'
 DB_SCHEMA='0.6.0'
 #DATABASE='testbean'
 DATABASE='beancounter'
@@ -41,7 +41,7 @@ DATABASE='beancounter'
 DBSYSTEM='PostgreSQL'
 
 # -------------------------- Functions ----------------------------------
-function usage_and_exit()
+function usage_and_exit
 {
     cat<<EOF
 Update beancounter tables
@@ -54,7 +54,7 @@ EOF
     exit 0
 }
 
-function set_version_to_current()
+function set_version_to_current
 {
     query="update beancounter set version = '$DB_SCHEMA'"
     echo $query | $DBCOMMAND 
@@ -62,7 +62,7 @@ function set_version_to_current()
 
 # test if symbols are numeric (finance-yahooquote cannot retrieve
 # symbols like 555750.DE but deals fine with the more mnemonic symbols_
-function check_for_numeric_symbols()
+function check_for_numeric_symbols
 {
     rc=0
     query="select distinct symbol from stockinfo where active"
@@ -92,7 +92,7 @@ EOF
 }
 
 # add 'active' column to stockinfo
-function add_beancounter_table_if_needed()
+function add_beancounter_table_if_needed
 {
     rc=0
     table=beancounter
@@ -126,7 +126,7 @@ function add_beancounter_table_if_needed()
 }
 
 # add 'active' column to stockinfo
-function add_active_if_needed()
+function add_active_if_needed
 {
     rc=0
     table=stockinfo
@@ -166,7 +166,7 @@ function add_active_if_needed()
 
 # test if given column (argument 1) exists in a given table (argument 2)
 # and add it with given specs (argument 3) if it does not already exist
-function add_unless_exists_column()
+function add_unless_exists_column
 {
     column=$1
     table=$2
@@ -207,7 +207,7 @@ function reindex_portfolio_table
 
 # test if given column (argument 1) exists in a given table (argument 2)
 # and if so rename it to new name (argument 3) and spec (arg 4; mysql only)
-function rename_if_not_exists_column()
+function rename_if_not_exists_column
 {
     oldname=$1
     table=$2

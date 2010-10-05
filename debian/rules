@@ -1,7 +1,7 @@
 #! /usr/bin/make -f
 #                                                       -*- makefile -*-
 # debian/rules file for the Debian/GNU Linux beancounter package
-# Copyright (C) 2001 by Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2001 - 2004 by Dirk Eddelbuettel <edd@debian.org>
 
 package	:= $(shell grep Package debian/control | sed 's/^Package: //')
 version	:= $(shell head -1 debian/changelog | \
@@ -11,22 +11,30 @@ debtmp	:= $(shell pwd)/debian/$(package)
 srcdir  := ../../progs/perl/beancounter
 webdir  := /home/edd/www/code/beancounter
 
+host	:= $(shell hostname)
+
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 export DH_COMPAT=3
 
 update:
-	cp -af	$(srcdir)/BeanCounter.pm 	\
-		$(srcdir)/beancounter 		\
-		$(srcdir)/README 		\
-		$(srcdir)/TODO	 		\
-		$(srcdir)/THANKS 		\
-		$(srcdir)/Makefile.PL 		\
-		$(srcdir)/example.beancounterrc	\
-		$(srcdir)/setup_beancounter	\
-		$(srcdir)/update_beancounter		.
+	cp -af	$(srcdir)/BeanCounter.pm 			\
+		$(srcdir)/beancounter 				\
+		$(srcdir)/README 				\
+		$(srcdir)/TODO	 				\
+		$(srcdir)/THANKS 				\
+		$(srcdir)/Makefile.PL 				\
+		$(srcdir)/example.beancounterrc			\
+		$(srcdir)/beancounter_example.txt 		\
+		$(srcdir)/beancounter_schema_postgresql.txt 	\
+		$(srcdir)/beancounter_schema_mysql.txt 		\
+		$(srcdir)/setup_beancounter			\
+		$(srcdir)/update_beancounter			.
 
 webdir:
+ifneq ($(host),sonny)
+		false
+endif
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
 		cd /tmp; \
 		fakeroot alien -r $(package)_$(version)_all.deb; \
@@ -76,7 +84,7 @@ clean:
 	dh_testroot
 	rm -f build-stamp .html
 	-test -f Makefile && $(MAKE) realclean
-	-rm -f pod2html-itemcache pod2html-dircache
+	-rm -f pod2html-itemcache pod2html-dircache pod2htmi.tmp pod2htmd.tmp
 	dh_clean
 
 binary-indep: build
@@ -89,7 +97,10 @@ binary-indep: build
 	$(MAKE) 		install PREFIX=$(debtmp)/usr
 	dh_perl	
 	dh_installdocs		THANKS TODO README README.Debian
-	dh_installexamples	example.beancounterrc flip_symbol.sh
+	dh_installexamples	example.beancounterrc flip_symbol.sh 	\
+				beancounter_example.txt 		\
+				beancounter_schema_postgresql.txt 	\
+				beancounter_schema_mysql.txt 		
         #dh_installmenu
         #dh_installinit
         #dh_installcron

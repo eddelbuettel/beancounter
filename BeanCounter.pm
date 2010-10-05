@@ -1,7 +1,7 @@
 #
 #  BeanCounter.pm --- A stock portfolio performance monitoring toolkit
 #
-#  Copyright (C) 1998 - 2003  Dirk Eddelbuettel <edd@debian.org>
+#  Copyright (C) 1998 - 2004  Dirk Eddelbuettel <edd@debian.org>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.55 2003/12/12 02:30:02 edd Exp $
+#  $Id: BeanCounter.pm,v 1.58 2004/01/22 01:06:04 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -68,7 +68,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.55 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.58 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -900,7 +900,7 @@ sub DatabaseHistoricalData {
     } elsif ($checked) {
       my ($date, $open, $high, $low, $close, $volume, $cmd);
       # based on the number of elements, ie columns, we split the parsing
-      if ($checked eq 5) {	# indices have no volume
+      if ($checked eq 5 or $checked eq 6) {   # volume, and maybe adj. close
 	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
 	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
 	%data = (symbol    => $symbol,
@@ -1254,17 +1254,20 @@ sub ScrubDailyData {          # stuff the output into the hash
       my $age = Delta_Format(DateCalc($hash{$key}{date}, $Config{lastbizday},
 				      undef, 2), 0, "%dt");
       if ($age > 5) {
-	warn "Ignoring $hash{$key}{name} with old date $hash{$key}{date}\n";
+        warn "Ignoring $hash{$key}{symbol} ($hash{$key}{name}) with old date $hash{$key}{date}\n";
+        #warn "Ignoring $hash{$key}{name} with old date $hash{$key}{date}\n";
 	#if $Config{debug};
 	$hash{$key}{date} = "N/A";
 	next;
       }
-      
+
       if (defined($Config{updatedate})) {        # and if we have an override
 	$hash{$key}{date} = $Config{updatedate}; # use it
-	warn "Overriding date for $hash{$key}{name} to $Config{updatedate}\n";
-      } else {
-	warn "$hash{$key}{name} has date $hash{$key}{date}\n";
+        warn "Overriding date for $hash{$key}{symbol} ($hash{$key}{name}) to $Config{updatedate}\n";
+        #warn "Overriding date for $hash{$key}{name} to $Config{updatedate}\n";
+       } else {
+        warn "$hash{$key}{symbol} ($hash{$key}{name}) has date $hash{$key}{date}\n";
+        #warn "$hash{$key}{name} has date $hash{$key}{date}\n";
       }
     }
 
@@ -1389,10 +1392,10 @@ Finance::Beancounter - Module for stock portfolio performance functions.
 
  use Finance::Beancounter;
 
-=head1 DESCRIPTION       
+=head1 DESCRIPTION
 
 B<Finance::BeanCounter> provides functions to I<download>, I<store> and
-I<analyse> stock market data. 
+I<analyse> stock market data.
 
 I<Downloads> are available of current (or rather: 15 or 20
 minute-delayed) price and company data as well as of historical price
@@ -1415,7 +1418,7 @@ implementation B<beancounter>, a convenient command-line script.
 
 The API might change and evolve over time. The low version number
 really means to say that the code is not in its final form yet, but it
-has been in use for well over two years. 
+has been in use for well over four years.
 
 More documentation is in the Perl source code.
 
@@ -1520,7 +1523,7 @@ F<LWP.3pm>, F<Date::Manip.3pm>
 
 =head1 COPYRIGHT
 
-Finance::BeanCounter.pm  (c) 2000 -- 2002 by Dirk Eddelbuettel <edd@debian.org>
+Finance::BeanCounter.pm  (c) 2000 -- 2004 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
 F<http://eddelbuettel.com/dirk/code/beancounter.html>.

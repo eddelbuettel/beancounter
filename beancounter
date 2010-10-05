@@ -2,7 +2,7 @@
 #
 #   beancounter --- A stock portfolio performance monitoring tool
 #
-#   Copyright (C) 1998 - 2002  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 1998 - 2004  Dirk Eddelbuettel <edd@debian.org>
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.46 2003/12/19 03:22:04 edd Exp $
+#   $Id: beancounter,v 1.48 2004/01/22 01:07:19 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -32,12 +32,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.46 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.48 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.6.4";		# updated from the debian/rules Makefile
+my $version = "0.6.1";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2003/12/19 03:22:04 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2004/01/22 01:07:19 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -128,7 +128,7 @@ sub help_and_exit {
 beancounter -- A stock portfolio performance monitoring tool
 
 beancounter version $version (RCS $rcsversion and $pmVersion) of $date
-Copyright (C) 1998 - 2002 by Dirk Eddelbuettel <edd\@debian.org>
+Copyright (C) 1998 - 2004 by Dirk Eddelbuettel <edd\@debian.org>
 beancounter comes with ABSOLUTELY NO WARRANTY. This is free software, 
 and you are welcome to redistribute it under certain conditions. 
 Please try '$PROGRAM_NAME warranty' for more details, or visit the
@@ -145,7 +145,7 @@ Commands:
 				optional type, owner, purchase price and
                                 purch. date can also be given (see example)
     addstock symbol ...		add stock(s) to database 
-    advanceement  	        report unrealized gains from lows
+    advancement  	        report unrealized gains from lows
     allreports			combines, dayendreport, status and risk
     backpopulate  symbol ...	fill with historic data for given stock(s)
     fxbackpopulate  symbol ...	fill with historic data for currency(ies)
@@ -225,10 +225,15 @@ sub display_report {
 	* $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
       $value_prev{$name} += $shares->{$key} * $prices->{$name} 
 	* $fx_prices->{$fx->{$name}}/$fx_prices->{$Config{currency}};
-    } else {
+    } elsif ( defined($prev_prices->{$name}) ) {
       $value{$name} += $shares->{$key} * $prices->{$name} 
 	* $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
       $value_prev{$name} += $shares->{$key} * $prev_prices->{$name} 
+	* $prev_fx_prices->{$fx->{$name}}/$prev_fx_prices->{$Config{currency}};
+    } else {
+      $value{$name} += $shares->{$key} * $prices->{$name}
+	* $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
+     $value_prev{$name} += $shares->{$key}
 	* $prev_fx_prices->{$fx->{$name}}/$prev_fx_prices->{$Config{currency}};
     }
   }
@@ -242,7 +247,7 @@ sub display_report {
 	     -16, substr($name,0,16), $fx->{$name}, 
 	     " (from $pricedate->{$name})",
 	     $value, $prices->{$name}); 
-    } elsif ($value_prev == 0) {
+    } elsif ( ($value_prev == 0) || (!defined($prev_prices->{$name})) ) {
       printf("%*s  %3s %20s %10.2f %8.2f %8.2f %7s\n", 
 	     -16, substr($name,0,16), $Config{currency}, 
 	     "(no price available)",
@@ -717,7 +722,7 @@ beancounter [options] command [command_arguments ...]
                            see below for a complete example
  allreports		   combines dayendreport, status and risk 
  addstock arg ...          add stock(s) with symbol arg to the database
- advanceement  		   report on unrealized gains from lows
+ advancement  		   report on unrealized gains from lows
  backpopulate  arg ...	   fill with historic data for given stock(s)
  dailyjob		   combines update, dayendreport, status + risk 
  dayendreport		   reports p/l changes relative to previous day
