@@ -2,8 +2,8 @@ Source: beancounter
 Section: misc
 Priority: optional
 Maintainer: Dirk Eddelbuettel <edd@debian.org>
-Standards-Version: 3.6.1.0
-Build-Depends-Indep: debhelper (>= 3.0.0), libdate-manip-perl, libstatistics-descriptive-perl, libfinance-yahooquote-perl, libdbi-perl
+Standards-Version: 3.6.2
+Build-Depends-Indep: debhelper (>= 4.0.0), libdate-manip-perl, libstatistics-descriptive-perl, libfinance-yahooquote-perl, libdbi-perl
 
 Package: beancounter
 Architecture: all

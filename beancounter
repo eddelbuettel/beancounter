@@ -3,7 +3,7 @@
 #
 #   beancounter --- A stock portfolio performance monitoring tool
 #
-#   Copyright (C) 1998 - 2005  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 1998 - 2006  Dirk Eddelbuettel <edd@debian.org>
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.73 2005/06/10 03:49:20 edd Exp $
+#   $Id: beancounter,v 1.82 2006/01/26 16:25:48 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -30,21 +30,21 @@ use Getopt::Long;		# long options
 use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg 
 	    $rcfile $sqlrestriction $extrafx $updatedate
 	    $dbsystem $dbname $fxupdate $commit $equityupdate
-	    $pacificfx $splitby);
+	    $ubcfx $splitby);
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.73 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.82 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.2";		# updated from the debian/rules Makefile
+my $version = "0.8.3";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2005/06/10 03:49:20 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2006/01/26 16:25:48 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
-($prevdatearg, $datearg, $equityupdate, $fxupdate, $commit, $pacificfx, $splitby) = 
-    ("6 month ago", "today", 1, 1, 1, 0, 2);
+($prevdatearg, $datearg, $equityupdate, $fxupdate, $commit, 
+	       $ubcfx, $splitby) = ("6 month ago", "today", 1, 1, 1, 0, 2);
 
 my %options = ("help" 		=> \$help,
 	       "debug"		=> \$debug,
@@ -61,7 +61,7 @@ my %options = ("help" 		=> \$help,
 	       "fxupdate!"	=> \$fxupdate,
 	       "equityupdate!"	=> \$equityupdate,
 	       "splitby=s"	=> \$splitby,
-	       "pacificfx!"	=> \$pacificfx,
+	       "ubcfx!"		=> \$ubcfx,
 	       "verbose"	=> \$verbose);
 
 help_and_exit() if (!GetOptions(%options) or $help or $#ARGV < 0);
@@ -71,7 +71,7 @@ my $command = shift @ARGV;
 
 my %Config = GetConfig($rcfile, $debug, $verbose, $fxarg,
 		       $extrafx, $updatedate, $dbsystem, $dbname, 
-		       $fxupdate, $commit, $equityupdate, $pacificfx,
+		       $fxupdate, $commit, $equityupdate, $ubcfx,
 		       $command);
 my $dbh = ConnectToDb();
 
@@ -125,6 +125,8 @@ if (TestInsufficientDatabaseSchema($dbh, $db_min_schema)) {
     portfolio_update($sqlrestriction);
   } elsif ($command =~ /^lsportfolio$/) {
     lsportfolio($sqlrestriction);
+  } elsif ($command =~ /^lspositions$/) {
+    lspositions($sqlrestriction);
   } elsif ($command =~ /^deactivate$/) {
     inactive_stock(@ARGV);
   } elsif ($command =~ /^split$/) {
@@ -153,7 +155,7 @@ sub help_and_exit {
 beancounter -- A stock portfolio performance monitoring tool
 
 beancounter version $version (RCS $rcsversion and $pmVersion) of $date
-Copyright (C) 1998 - 2005 by Dirk Eddelbuettel <edd\@debian.org>
+Copyright (C) 1998 - 2006 by Dirk Eddelbuettel <edd\@debian.org>
 beancounter comes with ABSOLUTELY NO WARRANTY. This is free software, 
 and you are welcome to redistribute it under certain conditions. 
 Please try '$PROGRAM_NAME warranty' for more details, or visit the
@@ -202,8 +204,8 @@ Options:
     --[no]fxupdate 		enforce/suppress FX update [fxupdate]
     --[no]commit	        enforce/suppress database update [commit]
     --[no]equityupdate 		enforce/suppress Equity update, [update]
-    --[no]pacificfx 		use/skip FX from UBC's Sauder school [skip]
-    --splitby arg               split stock history and position by this factor [2]
+    --[no]ubcfx 		use/skip FX from UBC's Sauder school [skip]
+    --splitby arg               split stock history + position by this factor [2]
     --rcfile file		use different configuration file
     --dbsystem system		use db backend system, default is PostgreSQL
     --dbname name		use db name, default is beancounter
@@ -267,7 +269,7 @@ sub display_report {
     } else {
       $value{$name} += $shares->{$key} * $prices->{$name}
 	* $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
-     $value_prev{$name} += $shares->{$key}
+      $value_prev{$name} += $shares->{$key}
 	* $prev_fx_prices->{$fx->{$name}}/$prev_fx_prices->{$Config{currency}};
     }
   }
@@ -344,6 +346,80 @@ sub display_status {
     printf("%*s %6d   %3s %8.2f   %3s %10.2f  %s %s\n", 
 	   -18, substr($name,0,17), 
 	   $totalshares{$name},  
+	   $fx->{$name}, 
+	   $prices->{$name},
+	   $Config{currency}, 
+	   $value,
+	   $daysheld ne "" ? sprintf("%5d days", $daysheld) : $daysheld, 
+	   $return ne ""   ? sprintf("%8.1f%%", $return) : $return);
+    $assets += $value;
+  }
+
+  foreach my $name (sort keys %{$cash}) { # cash part
+    my $value = $cash->{$name}{value} * $fx_prices->{$cash->{$name}{fx}} 
+      / $fx_prices->{$Config{currency}}; # adjust for FX
+    $assets += $value;
+    $assetbase += $value;
+
+    printf("%*s %s %3s %10.2f\n", 
+	   -16, substr($name,0,16), " " x 25,
+	   $Config{currency},
+	   $value,
+	  );
+  }
+
+  print "$fl\n";
+  printf("%-16s %29s %10.2f %20s\n", 
+	 "Grand Total",  $Config{currency}, $assets, 
+	 $assetbase ? sprintf("%20.2f%%",$weightedreturn/$assetbase) : "NaN");
+  print "$fl\n";
+  print "Returns are annualized if the holding period exceeds one year.\n";
+  print "$tl\n";
+
+}
+
+sub display_longstatus {
+  my ($date, $pretty_date, $prices, $pricedates, $fx_prices, $shares, $fx,
+      $cost, $pdate, $cash) = @_;
+
+  my ($tl,$fl) = build_lines(79);
+  print "$tl\n" . "\t\t\tPortfolio Status on $pretty_date\n$fl\n";
+  printf("%*s %6s %14s %16s %11s %9s\n%s\n",
+	 -18, "Name", "Shares", "Close", "Position", "Held", 
+	 "Return", $fl);
+  my (%value, %totalshares);
+  foreach my $key (sort keys %$shares) {
+    my ($name,$count) = split /:/, $key;
+    $value{$key} += $shares->{$key} * $prices->{$name} 
+      * $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
+  }
+  my ($assets,$weightedreturn,$assetbase) = (0,0,0);
+  foreach my $key (sort keys %value) {
+    my ($name,$count) = split /:/, $key;
+    my $value = $value{$key};
+    my ($daysheld,$return,$fxthen,$fxnow) = ("", "", 1.0, 1.0);
+    if (defined($pdate->{$key})) { # if we have a purchase date
+      $daysheld = Delta_Format(DateCalc($pdate->{$key}, $date,
+					undef, 2), 0, "%dt");
+      if (defined($cost->{$key}) and $daysheld >= 0 and $cost->{$key} != 0) {
+	if ($fx->{$name} ne $Config{currency}) {
+	  $fxthen = GetFXDatum($dbh, $pdate->{$key}, $fx->{$name});
+	  $fxnow = GetFXDatum($dbh, $date, $fx->{$name});
+	}
+ 	$return = (($prices->{$name} * $fxnow) / ($cost->{$key} * $fxthen) - 1)
+	  * 100 * Sign($shares->{$key});
+ 	# annualise if held longer than > 1 year
+	$return *= 365 / $daysheld if ($daysheld > 365);
+	# weigh returns by the invested amount, not the current value
+	# NB this omits possible changes in the FX rate
+	my $invested = $value / $prices->{$name} * $cost->{$key};
+	$weightedreturn += $return * $invested;
+	$assetbase += $invested;
+      }
+    }
+    printf("%*s %6d   %3s %8.2f   %3s %10.2f  %s %s\n", 
+	   -18, substr($name,0,17), 
+	   $shares->{$key},  
 	   $fx->{$name}, 
 	   $prices->{$name},
 	   $Config{currency}, 
@@ -544,6 +620,65 @@ sub lsportfolio {
   }
 }
 
+sub lspositions {
+  my $res = shift;
+
+  my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
+    = GetTodaysAndPreviousDates();
+  my ($fx, $prices, $prev_prices, $shares, $pricedate) 
+    = GetPriceData($dbh,$date,$res);
+  $fx->{'home currency'} = $Config{currency};
+
+  my ($tl,$fl) = build_lines(79);
+
+  # statement for listing out portfolio
+  my $stmt = qq{select p.symbol, p.shares, p.currency, p.type, p.owner, } .
+    qq{p.cost, p.date, s.name from portfolio p, stockinfo s };
+
+  # optional sql clauses for listing out portfolio
+  if ($sqlrestriction) {
+    $stmt = $stmt . qq{where $sqlrestriction };
+  } else {			# need a default clause
+    $stmt = $stmt . qq{where p.date > '1970-01-01' };
+  }
+  if ($fxarg) {
+    $stmt = $stmt . qq{and p.currency='$fxarg' };
+  }
+  $stmt = $stmt . 
+    qq{and s.active } .
+    qq{and p.symbol = s.symbol } .
+    qq{order by p.date};
+
+  print "Portfolio listing sql statement:\n$stmt\n" if $Config{verbose};
+
+  # perform the access
+  my $sth = $dbh->prepare($stmt);
+  my $rows = $sth->execute;
+
+  if ( defined($rows) and $rows > 0 ) {
+    # print the results
+    print "$tl\n\t\t\t\tPortfolio listing\n$fl\n";
+    printf "%-7.7s%7.7s%5.5s%8.8s%8.8s%8.8s%12.12s%8.8s%11s\n$fl\n",
+        "Symbol", "Shares", "FX", "  Type", "  Owner", "    Cost", "    Date",
+	" Price", " Net";
+    my $sum = 0;
+    while (my @row_ary = $sth->fetchrow_array) {
+      my ($fxthen,$fxnow) = (1.0,1.0);
+      my ($stock, $nb, $fx, $type, $owner, $cost, $pfdate, $name) = @row_ary;
+      if ($fx ne $Config{currency}) {
+	$fxthen = GetFXDatum($dbh, $pfdate, $fx);
+	$fxnow = GetFXDatum($dbh, $date, $fx);
+	print "Running SQL for $pfdate and $fx: $fxthen -> $fxnow\n" if $Config{debug};
+      }
+      my $pnl = $nb * ($prices->{$name}*$fxnow - $cost*$fxthen);
+      printf "%-7.7s%7d%5s%8s%8s%8.2f%12s%8.2f%11.2f\n",
+       $stock, $nb, $fx, $type, $owner, $cost, $pfdate, $prices->{$name}, $pnl;
+      $sum = $sum + $pnl;
+    }
+    printf "$fl\nTotal profit or loss\t\t\t\t\t%18.2f\n$tl\n", $sum;
+  }
+}
+
 sub day_end_report {
   my $res = shift;
 
@@ -676,8 +811,8 @@ sub portfolio_status {
 
   my $cash = GetCashData($dbh, $date, $res);
 
-  display_status($date, $pretty_date, $prices, $pricedates,
-		 $fx_prices, $shares, $fx, $cost, $pdate, $cash);
+  display_longstatus($date, $pretty_date, $prices, $pricedates,
+		     $fx_prices, $shares, $fx, $cost, $pdate, $cash);
 }
 
 # portfolio_report -- with two "free" dates, ie from last month to last week
@@ -708,7 +843,7 @@ sub portfolio_report {
 
 sub portfolio_update {
   my $res = shift;
-  UpdateFXviaPACIFIC($dbh, $res) if $Config{fxupdate} and $Config{pacificfx};
+  UpdateFXviaUBC($dbh, $res) if $Config{fxupdate} and $Config{ubcfx};
   UpdateFXDatabase($dbh, $res) if $Config{fxupdate}; # update FX db
   UpdateDatabase($dbh, $res) if $Config{equityupdate};
 }
@@ -801,17 +936,26 @@ sub fxbackpopulate {
 
   my ($iso2yahoo,$yahoo2iso) = GetFXMaps;
 
-  foreach my $iso (@arg) {
-    my $fx = $iso2yahoo->{$iso};
-    if (defined($fx) and $fx ne "") {
-      print "   backpopulating $iso (using $fx) from $fromdate to $todate\n"
-	;#if $Config{debug};
-      my @arr = GetHistoricalData($fx, $fromdate, $todate);
-      PrintHistoricalData($fx, @arr) if $Config{verbose};
-      DatabaseHistoricalFXData($dbh, $fx, @arr);
-    } else {
-      print "** Ignoring $iso which is not currently known to " .
-	"the internal tables\n";
+  if ($Config{ubcfx}) {		# if we use PACIFIC at UBC's Sauder School
+    my $aref = GetUBCFXData(\@arg, $fromdate, $todate);
+    #print "   backpopulating ", join(" ",@arg), 
+    #	" from $fromdate to $todate\n" if $Config{debug};
+    #no equiv. here: #PrintHistoricalData($iso, @arr) if $Config{verbose};
+    DatabaseHistoricalUBCFX($dbh, $aref, @arg);
+    ##DatabaseHistoricalFXData($dbh, $iso2yahoo->{$iso}, @arr);
+  } else {
+    foreach my $iso (@arg) {
+      my $fx = $iso2yahoo->{$iso};
+      if (defined($fx) and $fx ne "") {
+	print "   backpopulating $iso (using $fx) from $fromdate to $todate\n";
+	  #if $Config{debug};
+	my (@arr) = GetHistoricalData($fx, $fromdate, $todate);
+	PrintHistoricalData($fx, @arr) if $Config{verbose};
+	DatabaseHistoricalFXData($dbh, $fx, @arr);
+      } else {
+	print "** Ignoring $iso which is not currently known to " .
+	  "the internal tables\n";
+      }
     }
   }
 }
@@ -1025,8 +1169,8 @@ beancounter [options] command [command_arguments ...]
  --[no]fxupdate  	   enforce/suppress FX update, default is update
  --[no]commit	  	   enforce/suppress database update, default is commit
  --[no]equityupdate        enforce/suppress Equity update, default is update
- --[no]pacificfx    	   use/skip FX from UBC's Sauder school, default skip
- --splitby arg             split stock history and position by this factor [2]
+ --[no]ubcfx    	   use/skip FX from UBC's Sauder school, default skip
+ --splitby arg             split stock history + position by this factor [2]
  --dbsystem system         use db backend system, default is PostgreSQL
  --dbname name	           use db name, default is beancounter
 
@@ -1378,11 +1522,15 @@ suppress updates of Equity (i.e. stock) data during 'update'. The
 default is 'true' but '--noequityupdate' can be used to suppress the
 update of foreign exchange rates.
 
-B<--pacificfx> is a boolean switch to use the 'PACIFIC' FX rate service
-from the Sauder School at UBC. This is useful when the default FX rate 
-service at Yahoo! is erratic, or unreliable. The Yahoo! is still the 
-default as it provide more columns (open/high/low). However, the PACIFIC
-server provides a wider variety of exchange rates.
+B<--ubcfx> is a boolean switch to use the 'PACIFIC' FX rate service from the
+Sauder School at UBC. This is useful when the default FX rate service at
+Yahoo! is erratic, or unreliable. While the PACIFIC server provides a wider
+variety of exchange rates, Yahoo! can still be useful as it can provide more
+columns (open/high/low). However, during most of 2005, Yahoo! has been
+unrealiable for the exchange rates and has not provided historical FX
+data. On the other hand, the UBC service does not run on Canadian holidays so
+it cannot really server as a full substitute. Contributions for a new data
+acquisition, maybe via www.oanda.com would be welcome.
 
 B<--splitby> can be used to set a stock split factor other than the default
 of 2.
@@ -1542,7 +1690,7 @@ F<setup_beancounter.1>, F<update_beancounter.1>.
 
 =head1 COPYRIGHT
 
-beancounter is (c) 2000 - 2005 by Dirk Eddelbuettel <edd@debian.org>
+beancounter is (c) 2000 - 2006 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
 F<http://dirk.eddelbuettel.com/code/beancounter.html>.

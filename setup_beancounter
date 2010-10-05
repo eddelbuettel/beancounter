@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.38 2005/09/18 02:02:45 edd Exp $
+#   $Id: setup_beancounter,v 1.40 2006/01/13 04:04:16 edd Exp $
 
 #  If we really want to be independent of the underlying database, this 
 #  probably needs to written in Perl using DBI/DBD
@@ -53,7 +53,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.7.5'
+VERSION='0.8.3'
 DBSYSTEM='PostgreSQL'
 #DBSYSTEM='MySQL'
 SCHEMA_ONLY=0
@@ -68,7 +68,7 @@ fi
 
 # Dow Jones Industrial Average 
 # see for example http://www.amex.com/indexshares/index_shares_diamonds_list.stm
-DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG SBC UTX WMT"
+DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG T UTX WMT"
 
 # S&P500 is at http://www.spglobal.com/ssindexmain500text.html
 # NASDAQ is at http://www.nasdaq.com/asp/nasdaq100_activity.stm
@@ -165,7 +165,7 @@ function create_mysql_tables
 	day_change float default NULL,
 	bid float default NULL,
 	ask float default NULL,
-	volume int(11) default NULL,
+	volume numeric default NULL,
 	UNIQUE KEY stockprices_pkey(symbol,date)
     ) TYPE=MyISAM;
 
@@ -220,7 +220,7 @@ function create_postgres_tables
 	    day_change		float4 default null,
 	    bid			float4 default null,
 	    ask			float4 default null,
-	    volume		int4 default null
+	    volume		numeric default null
 	);
 	create unique index stockprices_pkey
 	    on stockprices (symbol, date);
@@ -307,7 +307,7 @@ function create_sqlite_tables
 	    day_change		float4 default null,
 	    bid			float4 default null,
 	    ask			float4 default null,
-	    volume		int4 default null
+	    volume		numeric default null
 	);
 	create unique index stockprices_pkey
 	    on stockprices (symbol, date);
@@ -571,14 +571,13 @@ if [ "$DBSYSTEM" = "PostgreSQL" ] || [ "$DBSYSTEM" = "MySQL" ]; then
     # testing database access from Perl
     echo "Verifying database access from Perl"
     set +e
-    beancounter checkdbconnection
+    $BEANCOUNTER checkdbconnection
     rc="$?"
     if [ "$rc" != 1 ]
     then
-       #    echo "Successful, continuing"
-       #else
-       echo "Failure -- please check database permission, possible requirement of"
-       echo "a password and other sources of failure to establish a connection."
+       echo "Failure --- please check database permission, possible"
+       echo "requirement of a password and other sources of failure"
+       echo "to establish a connection."
        exit 1
     fi
     set -e
@@ -595,14 +594,14 @@ execute "$BEANCOUNTER addportfolio IBM:50:USD XOM:75:USD C:100:USD GOOG:25:USD"
 
 echo -n "Filling $DATABASE with stock info and most recent prices "
 echo "for DJIA stocks"
-execute "$BEANCOUNTER addstock $DJIA"
+execute "$BEANCOUNTER addstock $DJIA ^GSPC"
 
 echo "Filling $DATABASE with historical prices for example portfolio stocks"
 #execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' CSCO NT.TO SIE.DE CGE.PA"
-execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' IBM XOM C GOOG"
+execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' IBM XOM C GOOG ^GSPC"
 
 echo "Filling $DATABASE with historical fx prices for EUR and CAD"
-execute "$BEANCOUNTER fxbackpopulate --prevdate '1 year ago'  --date '$LASTBIZDAY' EUR CAD"
+execute "$BEANCOUNTER fxbackpopulate --ubcfx --prevdate '1 year ago' --date '$LASTBIZDAY' EUR CAD"
 
 echo "Running portfolio pl report on (sample) portfolio"
 execute "$BEANCOUNTER plreport --date '$LASTBIZDAY'"

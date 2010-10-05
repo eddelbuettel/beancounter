@@ -1,7 +1,7 @@
 #
 #  BeanCounter.pm --- A stock portfolio performance monitoring toolkit
 #
-#  Copyright (C) 1998 - 2005  Dirk Eddelbuettel <edd@debian.org>
+#  Copyright (C) 1998 - 2006  Dirk Eddelbuettel <edd@debian.org>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.85 2005/06/11 00:46:00 edd Exp $
+#  $Id: BeanCounter.pm,v 1.91 2006/01/26 16:26:26 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -42,6 +42,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     DatabaseDailyData
 	     DatabaseHistoricalData
 	     DatabaseHistoricalFXData
+	     DatabaseHistoricalUBCFX
 	     DatabaseInfoData
 	     ExistsDailyData
 	     ExistsFXDailyData
@@ -51,6 +52,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     GetDate
 	     GetDailyData
 	     GetFXData
+	     GetFXDatum
 	     GetUBCFXData
 	     GetUBCFXHash
 	     GetFXMaps
@@ -66,13 +68,13 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     Sign
 	     UpdateDatabase
 	     UpdateFXDatabase
-	     UpdateFXviaPACIFIC 
+	     UpdateFXviaUBC 
 	     UpdateTimestamp
 	    );
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.85 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.91 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -183,7 +185,7 @@ sub GetTodaysAndPreviousDates {
 sub GetConfig {
   my ($file, $debug, $verbose, $fx, $extrafx, $updatedate,
       $dbsystem, $dbname, $fxupdate, $commit, $equityupdate, 
-      $pacificfx, $command) = @_;
+      $ubcfx, $command) = @_;
 
   %Config = ();			# reset hash
 
@@ -231,10 +233,10 @@ sub GetConfig {
   }
 
   # default to updateing stocks too
-  if ($pacificfx) {
-    $Config{pacificfx} = 1;
+  if ($ubcfx) {
+    $Config{ubcfx} = 1;
   } else {
-    $Config{pacificfx} = 0;
+    $Config{ubcfx} = 0;
   }
 
   unless ( -f $file ) {
@@ -404,22 +406,22 @@ sub GetUBCFXHash {
 # map between ISO country codes and Yahoo symbols for the Philly exchange
 sub GetFXMaps {
   my %iso2yahoo = (
-		   "AUD" => "^XAD",  	# was "AUDUSD=X",
-		   "CAD" => "^XCD", 	# was "CADUSD=X",
-		   "CHF" => "^XSF",	# was "CHFUSD=X",
+		   "AUD" => "^XAY",  	# was "^XAD", "AUDUSD=X",
+		   "CAD" => "^XCV", 	# was "^XCD", "CADUSD=X",
+		   "CHF" => "^XSY",	# was "^XSF", "CHFUSD=X",
 		   "EUR" => "^XEU",	# was "EURUSD=X",
-		   "GBP" => "^XBP",     # was "GBPUSD=X",
-		   "JPY" => "^XJY",	# was "JPYUSD=X",
+		   "GBP" => "^XBX",     # was "^XBP", "GBPUSD=X",
+		   "JPY" => "^XJZ",	# was "^XJY", "JPYUSD=X",
 		   "USD" => "----"
 		   ## deprecated  "DEM" => "^XDM"
 		  );
   my %yahoo2iso = (
-		   "^XAD" => "AUD",
-		   "^XCD" => "CAD",
-		   "^XSF" => "CHF",
+		   "^XAY" => "AUD",
+		   "^XCV" => "CAD",
+		   "^XSY" => "CHF",
 		   "^XEU" => "EUR",
-		   "^XBP" => "GBP",
-		   "^XJY" => "JPY",
+		   "^XBX" => "GBP",
+		   "^XJZ" => "JPY",
 		   "----" => "USD"
 		   ## deprecated  "^XDM" => "DEM"
 		  );
@@ -484,7 +486,7 @@ sub GetPriceData {
   @symbols = @{ $dbh->selectcol_arrayref($stmt) };
 
   # for each symbol, get most recent date subject to supplied date
-  $stmt  = qq{select max(date) 
+  $stmt  = qq{select max(date)
 	      from stockprices 
 	      where symbol = ? 
 	      and day_close > 0
@@ -501,9 +503,13 @@ sub GetPriceData {
     $sth->finish() if $Config{odbc};
   }
 
+#sum(p.shares*p.cost)/sum(p.shares) as p.cost, 
   # now get closing price etc at date
   $stmt =    qq{select i.symbol, i.name, p.shares, p.currency,
-		       d.day_close, p.cost, p.date, d.previous_close
+		       d.day_close, 
+		       p.cost, 
+		       p.date, 
+		       d.previous_close
 		from stockinfo i, portfolio p, stockprices d
 		where d.symbol = p.symbol
 		and i.symbol = d.symbol
@@ -539,6 +545,9 @@ sub GetPriceData {
   $stmt .= qq{ and d.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
+##  $stmt .= qq{ group by 	      i.symbol,i.name,p.shares,p.currency,d.day_close,p.date,d.previous_close };
+
+#select symbol, avg('today'-date) as days, sum(shares*cost)/sum(shares) as cost, sum(shares) as size, sum(shares*cost) as pos from portfolio where owner!='peter' group by symbol order by days desc;
   print "GetPriceData():\n\$stmt = $stmt\n" if $Config{debug};
 
   # now get closing price etc at date
@@ -561,6 +570,8 @@ sub GetPriceData {
       $name .= ":$i";
       $i++;
       $shares{$name} = $shares;
+      $purchdate{$name} = $pdate; # also store purchuse date on non-aggregate entry
+      $cost{$name} = $cost;	  # also store purchuse cost on non-aggregate entry
     }
   }
 
@@ -625,6 +636,15 @@ sub GetFXData {
   return (\%fx_prices, \%prev_fx_prices);
 }
 
+## simple wrapper for GetFXDate for single currency + date
+sub GetFXDatum {		
+  my ($dbh, $date, $fx) = @_;
+
+  my %fxhash; 
+  $fxhash{foo} = $fx;
+  my ($fxcurrent) = GetFXData($dbh, $date, \%fxhash); 
+  return $fxcurrent->{$fx};
+}
 
 ## NB no longer used as we employ Finance::YahooQuote directly
 sub GetQuote {			# taken from Dj's Finance::YahooQuote
@@ -1206,9 +1226,11 @@ sub DatabaseHistoricalData {
 	$cmd .= ",$data{volume} "    if defined($data{volume});
         $cmd .= ");";
       }
-      print "$cmd\n" if $Config{debug};
-      $dbh->do($cmd) or die $dbh->errstr;
-      $dbh->commit();
+      if ($Config{commit}) {
+	print "$cmd\n" if $Config{debug};
+	$dbh->do($cmd) or die $dbh->errstr;
+	$dbh->commit();
+      }
     } else {
       ;				# do nothing with bad data
     }
@@ -1281,9 +1303,11 @@ sub DatabaseHistoricalFXData {
 	##$cmd .= ",$data{volume} "    if defined($data{volume});
         $cmd .= ");";
       }
-      print "$cmd\n" if $Config{debug};
-      $dbh->do($cmd) or die $dbh->errstr;
-      $dbh->commit();
+      if ($Config{commit}) {
+	print "$cmd\n" if $Config{debug};
+	$dbh->do($cmd) or die $dbh->errstr;
+	$dbh->commit();
+      }
     } else {
       ;				# do nothing with bad data
     }
@@ -1291,6 +1315,36 @@ sub DatabaseHistoricalFXData {
   print "Done with $fx (using $symbol)\n" if $Config{verbose};
 }
 
+sub DatabaseHistoricalUBCFX {
+  my ($dbh, $aref, @arg) = @_;
+
+  my ($cmd, %data);
+
+  foreach my $lref (@$aref) {	# loop over all retrieved data
+    next if $lref->[0] eq "YYYY/MM/DD";
+    $data{date} = UnixDate(ParseDate($lref->[0]), "%Y%m%d");
+    my $i = 1;
+    foreach my $fx (@arg) {
+      if (ExistsFXDailyData($dbh,$fx,%data)) { # update data if it exists
+	$cmd = "update fxprices set ";
+	$cmd .= "day_close = " . 1.0/$lref->[$i] . " "  .
+   	    "where currency = '$fx' and date  = '$data{date}'";
+      } else {
+	$cmd  = "insert into fxprices (currency, date, day_close) ";
+        $cmd .= "values ('$fx', '$data{date}', 1.0/$lref->[$i] )";
+      }
+      $i++;
+      if ($Config{commit}) {
+	print "$cmd\n" if $Config{debug};
+	$dbh->do($cmd) or die $dbh->errstr;
+      }
+    }
+    #print "Done with $fx (using $symbol)\n" if $Config{verbose};
+  }
+  if ($Config{commit}) {
+    $dbh->commit();
+  }
+}
 
 sub DatabaseInfoData {		# initialise a row in the info table
   my ($dbh, %hash) = @_;
@@ -1434,6 +1488,9 @@ sub ParseDailyData {		# stuff the output into the hash
     if ($ra->[20] =~ m/(\S*)B$/) {
       # convert to millions from billions
       $hash{$key}{market_capitalisation} = $1*(1e3);
+    } elsif ($ra->[20] =~ m/(\S*)T$/) {
+      # reported in trillions -- convert to millions
+      $hash{$key}{market_capitalisation} = $1*(1e6);
     } elsif ($ra->[20] =~ m/(\S*)M$/) {
       # keep it in millions
       $hash{$key}{market_capitalisation} = $1;
@@ -1697,7 +1754,7 @@ sub UpdateFXDatabase {
 }
 
 ## use alternate FX data supply from the PACIFIC / Sauder School / UBC
-sub UpdateFXviaPACIFIC {
+sub UpdateFXviaUBC {
   my ($dbh, $res) = @_;
 
   # get all non-USD symbols (no USD as we don't need a USD/USD rate)
@@ -1707,10 +1764,10 @@ sub UpdateFXviaPACIFIC {
 		  and currency != 'USD'
 	    };
   $stmt .= "   and $res " if (defined($res));
-  print "UpdateFXviaPACIFIC():\n\$stmt = $stmt\n" if $Config{debug};
+  print "UpdateFXviaUBC():\n\$stmt = $stmt\n" if $Config{debug};
 
   my @symbols = @{ $dbh->selectcol_arrayref($stmt) };
-  print "UpdateFXviaPACIFIC() -- symbols=" . 
+  print "UpdateFXviaUBC() -- symbols=" . 
       join(" ", @symbols) . "\n" if $Config{debug};
 
   my %data;
@@ -1719,7 +1776,7 @@ sub UpdateFXviaPACIFIC {
 
   ## also fetch data via the PACIFIC server at Sauder / UBC
   my $ubcfx = GetUBCFXHash(\@symbols, $data{date}, $data{date});
-  print "PACIFIC server results\n", Dumper($ubcfx) if $Config{debug};
+  print "UBC server results\n", Dumper($ubcfx) if $Config{debug};
 
   foreach my $key (keys %{$ubcfx}) { # split these into reference to the arrays
     my $fx = $key; #$yahoo2iso->{$hash{$key}{symbol}};
@@ -1934,7 +1991,7 @@ F<LWP.3pm>, F<Date::Manip.3pm>
 
 =head1 COPYRIGHT
 
-Finance::BeanCounter.pm  (c) 2000 -- 2005 by Dirk Eddelbuettel <edd@debian.org>
+Finance::BeanCounter.pm  (c) 2000 -- 2006 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
 F<http://eddelbuettel.com/dirk/code/beancounter.html>.

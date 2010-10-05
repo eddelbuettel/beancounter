@@ -1,21 +1,21 @@
 #! /usr/bin/make -f
 #                                                       -*- makefile -*-
 # debian/rules file for the Debian/GNU Linux beancounter package
-# Copyright (C) 2001 - 2005 by Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2001 - 2006 by Dirk Eddelbuettel <edd@debian.org>
 
 package	:= $(shell grep Package debian/control | sed 's/^Package: //')
 version	:= $(shell head -1 debian/changelog | \
 			perl -nle 'm/\S+\s+\((\S+)\)/ && print $$1')
 debtmp	:= $(shell pwd)/debian/$(package)
 
-srcdir  := /home/edd/chibud/src/progs/perl/beancounter
+srcdir  := /home/edd/.chibud/src/progs/perl/beancounter
 webdir  := /home/edd/www/code/beancounter
 
 host	:= $(shell hostname)
 
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
-export DH_COMPAT=3
+export DH_COMPAT=5
 
 update:
 	cp -vaf	$(srcdir)/BeanCounter.pm 			\
@@ -43,11 +43,12 @@ update:
 	for i in setup_beancounter update_beancounter; do \
 	   perl -p -i -e "s/VERSION='.*'/VERSION='"$(version)"'/" $$i; \
 	done
+	perl Makefile.PL
 	make 
 
 perlrelease:
 	perl -p -i -e \
-		"s/'VERSION'	\t=> '\d.\d.\d'/'VERSION'\t\t=> '"$(version)"'/"\
+	   "s/'VERSION'	\t=> '\d.\d.\d'/'VERSION'\t\t=> '"$(version)"'/"\
 		Makefile.PL 
 	perl Makefile.PL
 	make dist
@@ -154,7 +155,7 @@ binary-indep: build
         #dh_installmenu
         #dh_installinit
         #dh_installcron
-	dh_installmanpages	
+	dh_installman	
         #dh_undocumented	setup_beancounter.1 update_beancounter.1
 	dh_installchangelogs	
 	dh_compress
