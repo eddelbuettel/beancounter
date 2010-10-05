@@ -6,10 +6,14 @@
 package	:= $(shell grep Package debian/control | sed 's/^Package: //')
 version	:= $(shell head -1 debian/changelog | \
 			perl -nle 'm/\S+\s+\((\S+)\)/ && print $$1')
-debtmp	:= $(shell pwd)/debian/tmp
+debtmp	:= $(shell pwd)/debian/$(package)
 
 srcdir  := /home/edd/progs/perl/beancounter
 webdir  := /home/edd/www/code/beancounter
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+export DH_COMPAT=3
 
 update:
 	cp -af	$(srcdir)/BeanCounter.pm 	\

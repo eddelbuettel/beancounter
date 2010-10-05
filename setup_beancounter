@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.6 2001/02/10 20:16:01 edd Exp $
+#   $Id: setup_beancounter,v 1.7 2001/04/19 03:40:10 edd Exp edd $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -121,7 +121,7 @@ EOF
 function exit_if_exists()
 {
     set +e
-    result=`psql -l | grep beancounter`
+    result=`psql template1 -l | grep beancounter`
     set -e
     if [ "$result" != "" ]
     then
@@ -157,7 +157,7 @@ function exit_if_root()
 function exit_if_no_postgres_user()
 {
     set +e
-    ( psql -q -c "select * from pg_user;" | grep -v $1 ) >/dev/null 2>&1 
+    ( psql template1 -q -c "select * from pg_user;" | grep -v $1 ) >/dev/null 2>&1 
     if [ $? -eq 1 ]
     then
 	echo ""
@@ -217,8 +217,11 @@ execute "beancounter addstock $DJIA"
 echo "Filling BeanCounter with historical prices for DJIA stocks"
 execute "beancounter backpopulate --prevdate '1 year ago' --date 'friday 1 week ago' CSCO NT"
 
-echo "Running portfolio report on (sample) portfolio"
-execute "beancounter plreport --prevdate 'friday 4 weeks ago' --date 'friday 1 week ago'"
+echo "Running portfolio pl report on (sample) portfolio"
+execute "beancounter plreport"
+
+echo "Running portfolio dayendreport on (sample) portfolio"
+execute "beancounter dayendreport"
 
 echo "Done."
 exit 0

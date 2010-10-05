@@ -34,6 +34,9 @@
   "scrubbing" between retrieval and databasing might help: we can check if
   other data points for the same exchange have a different date and then use
   this as an override. Might be overkill.
+  [ partly done; now have --forcedate option ]
 
 * Allow for cash holdings
+  [ partly done ]
 
+* Options (.X) volume adjustment

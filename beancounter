@@ -18,14 +18,12 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.19 2001/03/30 01:25:11 edd Exp $
+#   $Id: beancounter,v 1.24 2001/08/17 01:44:13 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
 
 use strict;			# be careful out there, son
-use Carp;			# better error messages
-use Data::Dumper;		# debug/dump data structures
 use Date::Manip;		# general date parsing / calcs
 use English;			# explicit variable names
 use Getopt::Long;		# long options
@@ -34,11 +32,11 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.19 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.24 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.1.9";		# updated from the debian/rules Makefile
+my $version = "0.3.1";		# updated from the debian/rules Makefile
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2001/03/30 01:25:11 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2001/08/17 01:44:13 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -88,7 +86,7 @@ if ($command =~ /^plreport$/) {
 } elsif ($command =~ /^delete$/) {
   delete_stock(@ARGV);
 } elsif ($command =~ /^destroydb$/) {
-  deletedb(@ARGV);
+  deletedb(@ARGV);		# does not return
 } elsif ($command =~ /^quote$/) {
   quote(@ARGV);
 } elsif ($command =~ /^risk$/) {
@@ -100,7 +98,7 @@ if ($command =~ /^plreport$/) {
 } elsif ($command =~ /^warranty$/) {
   warranty();
 } else {
-  carp "Ignoring unknown command '$command'";
+  warn "Ignoring unknown command '$command'";
 }
 
 CloseDB($dbh);
@@ -216,17 +214,26 @@ sub display_report {
   foreach my $name (sort keys %value) {
     my $value = $value{$name};
     my $value_prev = $value_prev{$name};
+    print "$name $value_prev\n" if $Config{verbose};
     if (Date_Cmp($pricedate->{$name}, $Config{lastbizday}) != 0) {
       printf("%*s  %3s %19s  %10.2f %8.2f\n", 
 	     -16, substr($name,0,16), $fx->{$name}, 
 	     " (from $pricedate->{$name})",
 	     $value, $prices->{$name}); 
-    }else {
+    } elsif ($value_prev == 0) {
+      printf("%*s  %3s %10.2f %8.2f  %10.2f %8.2f %8.2f %7s\n", 
+	     -16, substr($name,0,16), $Config{currency}, #$fx->{$name}, 
+	     $value_prev, $prev_prices->{$name},
+	     $value, $prices->{$name}, 
+	     $value-$value_prev, 
+	     "N/A"); 
+    } else {
       printf("%*s  %3s %10.2f %8.2f  %10.2f %8.2f %8.2f %6.2f%%\n", 
 	     -16, substr($name,0,16), $Config{currency}, #$fx->{$name}, 
 	     $value_prev, $prev_prices->{$name},
 	     $value, $prices->{$name}, 
-	     $value-$value_prev, 100*($value/$value_prev-1)); 
+	     $value-$value_prev, 
+	     100*($value/$value_prev-1)*Sign($value)); 
     }
     $assets += $value;
     $assets_prev += $value_prev;
@@ -237,7 +244,6 @@ sub display_report {
 	 $assets-$assets_prev, 100*($assets/$assets_prev-1));
   print "$tl\n";
 }
-
 
 sub display_status {
   my ($date, $pretty_date, $prices, $pricedates, $fx_prices, $shares, $fx,
@@ -263,10 +269,10 @@ sub display_status {
       $daysheld = Delta_Format(DateCalc($pdate->{$name}, $date,
 					undef, 2), 0, "%dt");
       if (defined($cost->{$name}) and $daysheld >= 0) {
-##	$return = ($prices->{$name} / $cost->{$name} - 1) * 36500 / $daysheld;
- 	$return = ($prices->{$name} / $cost->{$name} - 1) * 100;
-## 	# annualise if held longer than > 1 year
-## 	$return *= 365 / $daysheld if ($daysheld > 365);
+ 	$return = ($prices->{$name} / $cost->{$name} - 1) 
+	  * 100 * Sign($totalshares{$name});
+ 	# annualise if held longer than > 1 year
+	$return *= 365 / $daysheld if ($daysheld > 365);
 	# weigh returns by the invested amount, not the current value
 	# NB this omits possible changes in the FX rate
 	my $invested = $value / $prices->{$name} * $cost->{$name};
@@ -281,8 +287,8 @@ sub display_status {
 	   $prices->{$name},
 	   $Config{currency}, 
 	   $value,
-	   $daysheld ? sprintf("%4d days", $daysheld) : $daysheld, 
-	   $return   ? sprintf("%7.1f%%", $return) : $return);
+	   $daysheld ne "" ? sprintf("%4d days", $daysheld) : $daysheld, 
+	   $return ne ""   ? sprintf("%7.1f%%", $return) : $return);
     $assets += $value;
   }
 
@@ -291,7 +297,6 @@ sub display_status {
       / $fx_prices->{$Config{currency}}; # adjust for FX
     $assets += $value;
     $assetbase += $value;
-    #print "$name -- $cash->{$name}{value} $cash->{$name}{fx} $value\n";
 
     printf("%*s %s %3s %10.2f\n", 
 	   -16, substr($name,0,16), " " x 25, 
@@ -304,6 +309,8 @@ sub display_status {
   printf("%-16s %29s %10.2f %20s\n", 
 	 "Grand Total",  $Config{currency}, $assets, 
 	 $assetbase ? sprintf("%19.2f%%",$weightedreturn/$assetbase) : "NaN");
+  print "$fl\n";
+  print "Returns are annualized if the holding period exceeds one year.\n";
   print "$tl\n";
 
 }
@@ -357,25 +364,24 @@ non-parametric VaR estimate, requires at least 100 observations.\n";
 
 sub day_end_report {
   my $res = shift;
-
+ 
+  # day-end report is always relative to the previous day, we enforce previous
+  # date of 24 hrs before given date by unsetting any cmdline argument that 
+  # there might have been as the function will then return previous biz day
   my $prevdatesaved = $prevdatearg;
-  # day-end report is always relative to the previous day
-  # so we enforce a previous date of 24 hrs before the given date
-  $prevdatearg = UnixDate(DateCalc("$datearg", "- 24hours"), "%Y%m%d");
+  $prevdatearg = undef; 
 
   my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
     = GetTodaysAndPreviousDates();
-
   my ($fx, $prices, $prev_prices, $shares, $pricedate) 
     = GetPriceData($dbh,$date,$res);
-
   $fx->{'home currency'} = $Config{currency};
 
   my ($fx_prices, $prev_fx_prices) = GetFXData($dbh, $date, $fx);
   display_report($pretty_date, $pretty_prev_date, $prices, $prev_prices,
 		 $fx_prices, $prev_fx_prices, $shares, $fx, $pricedate);
 
-  $prevdatearg = $prevdatesaved;
+  $prevdatearg = $prevdatesaved; # and reset any potential cmdline arg
 }
 
 sub portfolio_risk {
@@ -432,7 +438,7 @@ sub portfolio_report {
 
   ## need to do a sanity check on the date
   unless (Date_Cmp(ParseDate($prevdatearg), ParseDate($datearg)) < 0) {
-    carp "Error: Date $prevdatearg note prior to date $datearg";
+    warn "Error: Date $prevdatearg note prior to date $datearg";
   }
 
   my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
@@ -498,7 +504,8 @@ sub add_index {
   foreach my $arg (@arg) {	# and loop over the stocks
     my $cmd = "insert into indices values ( '$arg', '$index' );";
     print "$cmd\n" if $Config{verbose};
-    $dbh->do($cmd) or carp "\nFailed with $cmd";
+    $dbh->do($cmd) or warn "\nFailed with $cmd";
+    $dbh->commit();		# the ODBC driver needs that for a weird reason
   }
 }
 
@@ -534,8 +541,9 @@ sub add_portfolio {
     $fx = $Config{currency} unless defined($fx); 
     if (defined($stock) and defined($nb)) {
       $sth->execute($stock, $nb, $fx, $type, $owner, $cost, $date);
+      $dbh->commit();		# the ODBC driver needs that for a weird reason
     } else {
-      carp "Ignoring invalid argument $arg";
+      warn "Ignoring invalid argument $arg";
     }
 
     $infosth->execute($stock);
@@ -556,15 +564,19 @@ sub delete_stock {
     foreach my $table (qw/ stockinfo stockprices indices portfolio/) {
       my $cmd = "delete from $table where symbol = '$arg';";
       print "$cmd\n" if $Config{verbose};
-      $dbh->do($cmd) or carp "\nFailed with $cmd";
+      $dbh->do($cmd) or warn "\nFailed with $cmd";
+      $dbh->commit();		# the ODBC driver needs that for a weird reason
     }
   }
 }
 
 
 sub deletedb {			# this unfortunately is PostgreSQL specific
-  system("psql -q -c \"drop database beancounter\"") == 0 
-    or croak "Could not destroy database";
+  CloseDB($dbh);		# or we won't be able to close
+#  system("psql -q -c \"drop database beancounter\"") == 0 
+  system("dropdb beancounter")	# requires PostgreSQL >= 7.1
+    or die "Could not destroy database";
+  exit(0);
 }
 
 
@@ -962,10 +974,10 @@ F<LWP.3pm>, F<Date::Manip.3pm>, F<Statistics::Descriptive.3pm>
 
 =head1 COPYRIGHT
 
-beancounter is (c) 2000 by Dirk Eddelbuettel <edd@debian.org>
+beancounter is (c) 2000, 2001 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
-F<http://rosebud.sps.queensu.ca/~edd/code/beancounter.html>.
+F<http://eddelbuettel.com/dirk/code/beancounter.html>.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -983,6 +995,6 @@ The Finance::YahooQuote module by Dj Padzensky (on the web at
 F<http://www.padz.net/~djpadz/YahooQuote/>) served as the backbone for
 data retrieval, and a guideline for the extension to the non-North
 American quotes which was already very useful for the real-time ticker 
-F<http://rosebud.sps.queensu.ca/~edd/code/smtm.html>.
+F<http://eddelbuettel.com/dirk/code/smtm.html>.
 
 =cut

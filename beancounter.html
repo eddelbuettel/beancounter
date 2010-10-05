@@ -109,6 +109,17 @@ PostgreSQL) is found.</P>
 <HR>
 <H1><A NAME="examples">EXAMPLES</A></H1>
 <PRE>
+ beancounter update --forceupdate today</PRE>
+<PRE>
+    This updates the database: it extends timeseries data (such as
+    open, low, high, close, volume) with data for the current day,
+    and overwrites static data (such as capital, price/earnings, ...) 
+    with current data. All stocks held in the portfolio are updated
+    (unless the --restriction argument instructs otherwise). The 
+    --forceupdate option lets the program corrects incorrect dates 
+    returned from Yahoo! (which happens every now and so often), but
+    be careful to correct for this on public holidays.</PRE>
+<PRE>
  beancounter addportfolio SUNW:100:USD:joe:401k:85.50:19991117 \
                           IBM:100:USD:joe:401k:90.25:20000320  \
                           SPY:50:USD:joe:ira:142.25:20000620</PRE>
@@ -380,9 +391,9 @@ on.</P>
 <P>
 <HR>
 <H1><A NAME="copyright">COPYRIGHT</A></H1>
-<P>beancounter is (c) 2000 by Dirk Eddelbuettel &lt;<A HREF="mailto:edd@debian.org">edd@debian.org</A>&gt;</P>
+<P>beancounter is (c) 2000, 2001 by Dirk Eddelbuettel &lt;<A HREF="mailto:edd@debian.org">edd@debian.org</A>&gt;</P>
 <P>Updates to this program might appear at 
-<EM><A HREF="http://rosebud.sps.queensu.ca/~edd/code/beancounter.html">http://rosebud.sps.queensu.ca/~edd/code/beancounter.html</A></EM>.</P>
+<EM><A HREF="http://eddelbuettel.com/dirk/code/beancounter.html">http://eddelbuettel.com/dirk/code/beancounter.html</A></EM>.</P>
 <P>This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
@@ -398,7 +409,7 @@ information.</P>
 <EM><A HREF="http://www.padz.net/~djpadz/YahooQuote/">http://www.padz.net/~djpadz/YahooQuote/</A></EM>) served as the backbone for
 data retrieval, and a guideline for the extension to the non-North
 American quotes which was already very useful for the real-time ticker 
-<EM><A HREF="http://rosebud.sps.queensu.ca/~edd/code/smtm.html">http://rosebud.sps.queensu.ca/~edd/code/smtm.html</A></EM>.</P>
+<EM><A HREF="http://eddelbuettel.com/dirk/code/smtm.html">http://eddelbuettel.com/dirk/code/smtm.html</A></EM>.</P>
 
 </BODY>
 

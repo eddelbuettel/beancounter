@@ -1,3 +1,26 @@
+beancounter (0.3.1) unstable; urgency=low
+
+  * Bug fix release:
+    - rewrote SQL queries using '--restriction arg' to allow for multiple
+      portfolio restrictions to be imposed (BeanCounter.pm)
+    - reflect change at Yahoo! Europe and convert quotes from ';' field
+      seperator and ',' decimal point (BeanCounter.pm: GetQuote)
+    - ensure that day_end_report is relative to previous day (beancounter)
+    - add dbh->commit() after database updates (beancounter: add_index,
+      add_portfolio; BeanCounter.pm: delete_stock)
+  * Some other minor changes:
+    - annualise returns if stock held > 1 year (beancounter: display_status)
+    - make some functions more compact with selectcol_arrayref (BeanCounter.pm)
+    - use dropdb(1) to delete database (requires PostgreSQL 7.*) (beancounter)
+    - add warning if correlation non computable (BeanCounter.pm: GetRiskData)
+    - add warning if date not parseable (BeanCounter: ParseDailyData)
+    - add historica price retrieval for (US) mutual funds 
+      (BeanCounter.pm: GetHistoricalData)
+    - if data inconsistent, adjust close to to previous_close plus change
+      (BeanCounter: SrubDailyData)
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Mon, 13 Aug 2001 21:53:18 -0500
+
 beancounter (0.3.0) unstable; urgency=low
 
   * New release with the following code changes
