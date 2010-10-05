@@ -19,14 +19,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
-# $Id: Makefile.PL,v 1.3 2004/04/03 15:22:18 edd Exp $
+# $Id: Makefile.PL,v 1.3 2004/04/03 15:22:18 edd Exp edd $
 #
 
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
 	      'NAME'		=> 'Finance::BeanCounter',
-	      'VERSION'		=> '0.7.5',
+	      'VERSION'		=> '0.7.6',
 	      'PREREQ_PM'   	=> { "LWP::UserAgent"   => 1.62,
 				     "HTTP::Request"    => 1.23,
 				     "HTML::Parser"     => 2.20,
@@ -38,8 +38,9 @@ WriteMakefile(
 				     ##   "DBD::ODBC"	=> 0.28,
 				     ##   "DBD::mysql"	=> 2.0416,
 				     ##   "DBD::SQLite",
-				     "Statistics::Descriptive" => 2.4
-				   },      
+				     "Statistics::Descriptive" => 2.4,
+				     "Finance::YahooQuote" => 0.20
+				   },
 	      ($] >= 5.005 ?
 	       ('ABSTRACT'   => 'Stock portfolio performance monitoring tool',
 		'AUTHOR'     	=> 'Dirk Eddelbuettel (edd@debian.org)')

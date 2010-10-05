@@ -1,3 +1,16 @@
+beancounter (0.7.6) unstable; urgency=low
+
+  *  Bug fix release 
+  
+     - [Makefile.PL]: Added dependency on Finance::YahooQuote which should
+       have been added a long time ago -- thanks, CPAN Testers!
+  
+     - [setup_beancounter]: Fixed path to test version of beancounter
+  
+     - [contrib/getDiv]: Added contributed script by Joao Antunes Costa 
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Wed, 28 Jul 2004 22:42:48 -0500
+
 beancounter (0.7.5) unstable; urgency=low
 
   *  Bug fix release 
@@ -16,8 +29,8 @@ beancounter (0.7.4) unstable; urgency=low
 
   *  Bug fix release with several contributed patches:
   
-     - [BeanCounter.pm]: Added portfolio export function GetPortfolioData which
-       will eventually be used by smtm and others, provided by Kevin Kim
+     - [BeanCounter.pm]: Added portfolio export function GetPortfolioData 
+       which will eventually be used by smtm and others, provided by Kevin Kim
   
      - [BeanCounter.pm]: Ensure proxy information is set, provided by Joao 
        Costa

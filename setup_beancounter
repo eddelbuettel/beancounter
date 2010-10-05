@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.30 2004/06/24 23:18:33 edd Exp $
+#   $Id: setup_beancounter,v 1.31 2004/07/20 01:27:15 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -42,7 +42,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.7.5'
+VERSION='0.7.6'
 #DATABASE='testbean'
 #PASSWORD=
 DBSYSTEM='PostgreSQL'
@@ -552,7 +552,7 @@ fi
 # testing database access from Perl
 echo "Verifying database access from Perl"
 set +e
-/tmp/beancounter checkdbconnection
+beancounter checkdbconnection
 rc="$?"
 if [ "$rc" != 1 ]
 then

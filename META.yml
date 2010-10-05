@@ -1,12 +1,13 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Finance-BeanCounter
-version:      0.7.5
+version:      0.7.6
 version_from: 
 installdirs:  site
 requires:
     Date::Manip:                   5.35
     DBI:                           1.16
+    Finance::YahooQuote:           0.2
     HTML::Parser:                  2.2
     HTTP::Request:                 1.23
     LWP::UserAgent:                1.62

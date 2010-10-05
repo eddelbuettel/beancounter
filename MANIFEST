@@ -17,4 +17,5 @@ THANKS
 TODO
 update_beancounter
 t/01base.t
+contrib/getDiv
 META.yml                                 Module meta-data (added by MakeMaker)

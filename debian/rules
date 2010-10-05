@@ -18,7 +18,7 @@ host	:= $(shell hostname)
 export DH_COMPAT=3
 
 update:
-	cp -af	$(srcdir)/BeanCounter.pm 			\
+	cp -vaf	$(srcdir)/BeanCounter.pm 			\
 		$(srcdir)/beancounter 				\
 		$(srcdir)/README 				\
 		$(srcdir)/README.Debian				\
@@ -33,6 +33,7 @@ update:
 		$(srcdir)/beancounter_schema_sqlite.txt 	\
 		$(srcdir)/setup_beancounter			\
 		$(srcdir)/update_beancounter			\
+		$(srcdir)/contrib/				\
 		$(srcdir)/t/					.
 
         # update the $$version field in the perl code as well as in
@@ -43,11 +44,12 @@ update:
 	   perl -p -i -e "s/VERSION='.*'/VERSION='"$(version)"'/" $$i; \
 	done
 	perl -p -i -e \
-		"s/'VERSION'	\t=> '0.7.3'/'VERSION'\t\t=> '"$(version)"'/" \
+		"s/'VERSION'	\t=> '0.7.5'/'VERSION'\t\t=> '"$(version)"'/"\
 		Makefile.PL 
 	perl Makefile.PL
 	make dist
 	mv -v Finance-BeanCounter-$(version).tar.gz ..
+
 
 webdir:
 ifneq ($(host),sonny)
