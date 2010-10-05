@@ -1,3 +1,16 @@
+beancounter (0.2.1) unstable; urgency=low
+
+  * Bug fix release:
+    - setup_beancounter: change last fromdate,todate to prevate,date
+    - setup_beancounter: use NT, not NT.TO, to avoid FX use in demo
+    - beancounter: Call psql, not destroydb or dropdb, to delete db
+    - debian/control: Also depend on libdbd-pg-perl (Closes: #85363)
+  * Improved documentation by adding 
+    - example.beancounterrc:  New file with (commented) rc file example
+    - beancounter, BeanCounter.pm: Expanded POD documentation  
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Sat, 10 Feb 2001 13:28:36 -0600
+
 beancounter (0.2.0) unstable; urgency=low
 
   * New release with the following code changes
@@ -9,7 +22,7 @@ beancounter (0.2.0) unstable; urgency=low
       be downloaded and stored by the 'update' command
     - date and prevdate default to today and yesterday
     - fromdate and todate options replaced by consistent use
-      of date and fromdate
+      of prevdate and date
     - more documentation
     - data display layout changed
   
@@ -18,8 +31,8 @@ beancounter (0.2.0) unstable; urgency=low
 beancounter (0.1.1) unstable; urgency=low
 
   * Bugfix release:
-  * BeanCounter.pm: corrected minor typo in DatabaseInfoData
-  * debian/rules: don't create beancounter.1 -- Makefile.PL does that too
+    - BeanCounter.pm: corrected minor typo in DatabaseInfoData
+    - debian/rules: don't create beancounter.1 -- Makefile.PL does that too
 
  -- Dirk Eddelbuettel <edd@debian.org>  Tue, 25 Jul 2000 22:47:40 -0400
 

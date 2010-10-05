@@ -1,0 +1,46 @@
+#! /bin/sh -e
+#
+#   update_beancounter --- Modify beancounter database
+#  
+#   Copyright (C) 2000  Dirk Eddelbuettel <edd@debian.org>
+#  
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#  
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#  
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+#   $Id$
+
+# If we really want to be independent of the underlying database, this 
+# probably needs to written in Perl using DBI/DBD
+#
+# For now it is PostgreSQL specific
+
+# psql(1) arguments -- you could add host, port, user, ... here
+PSQL="psql -q -d beancounter"
+
+# add columns type, owner, cost and (purchase) date
+$PSQL -c "\d portfolio" | grep -q type || \
+	    $PSQL -c "alter table portfolio add type varchar(12);"
+$PSQL -c "\d portfolio" | grep -q owner || \
+	    $PSQL -c "alter table portfolio add owner varchar(12);"
+$PSQL -c "\d portfolio" | grep -q cost || \
+	    $PSQL -c "alter table portfolio add cost float(4);"
+$PSQL -c "\d portfolio" | grep -q date || \
+	    $PSQL -c "alter table portfolio add date date;"
+
+# replace index by a non-unique index to allow multiple entries
+$PSQL -c "drop index portfolio_pkey;"
+$PSQL -c "create unique index portfolio_pkey on portfolio (symbol, owner, date);"
+
+echo "Done."
+exit 0

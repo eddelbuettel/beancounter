@@ -405,8 +405,10 @@ sub DatabaseDailyData {		# a row to the dailydata table
     print "$hash{$key}{symbol} " if $Config{verbose};
 
     if ($hash{$key}{date} ne $Config{today}) {
-      carp "Ignoring $hash{$key}{symbol} with date $hash{$key}{date}";
-      next;
+      carp "Warning: $hash{$key}{symbol} date $hash{$key}{date} ".
+	"is not current date $Config{today}";
+      # just warn, let's not ignore the data
+      ## next;
     }
 
     my $cmd = "insert into stockprices values (" . 
@@ -798,70 +800,6 @@ The API might change anytime. The low version number really means to
 say that the code is not in its final form yet. Things might change. 
 
 Documentation is at this point mostly in the Perl module source code.
-
-=head1 SYSTEM OVERVIEW
-
-The following sections detail some of the design issues of 
-the B<Finance::BeanCounter> system.
-
-=head2 DATABASE REQUIREMENTS
-
-B<beancounter> currently depends of PostgreSQL. Another DB backend
-could be used, provided suitable Perl DBI drivers are available. The
-B<setup_beancounter> script initializes the database, creates the
-required tables and fills them with some example data. It is a
-starting point for local modifications.
-
-The connection to the database is made via a dedicated function in
-the B<BeanCounter.pm> module, changes would only have to be made
-there.  As of this writing the B<Perl DBI> (the database-independent
-interface for Perl) is used along the DBI driver for PostgreSQL; an
-extension is planned for the DBI ODBC driver. Ports for MySQL,
-Oracle, ... are encouraged.
-
-=head2 CONFIG FILE
-
-A configuration file F<~/.beancounterrc> is read if found. It
-currently supports the following options:
-
-=over 8
-
-=item I<currency> to specify into which home currency holdings and
-profits/losses have to be converted
-
-=item I<user> to specify the userid for the DB connection
-
-=item I<firewall> to specify a firewallid:firewallpasswd combination
-
-=item I<proxy> to specify the address of a proxy server 
-
-=item I<odbc> is a switch to turn ODBC connection on (default) or off
-in which case the DBI PostgreSQL driver is used
-
-=item I<host> to specify the database server on which the
-B<BeanCounter> database resides (this is needed only for the alternate
-connection via the DBI-Pg driver in case DBI-ODBC is not used)
-
-=back
-
-=head2 ODBC CONFIGURATION
-
-There are now several ODBC systems for Linux / Unix. The following
-F<~/.odbc.ini> work with the B<iODBC> library on my Debian GNU/Linux system:
-
-   [ODBC Data Sources]
-   beancounter = BeanCounter Database
-
-   [beancounter]
-   Driver       = /usr/lib/libpsqlodbc.so
-   Database     = beancounter
-   Servername   = localhost
-
-   [ODBC]
-   InstallDir = /usr/lib
-
-Suggestions are welcome of how to set B<beancounter> up with other
-ODBC libraries.
 
 =head1 DATABASE LAYOUT
 

@@ -1,0 +1,11 @@
+Andreas Wuest <AndreasWuest@gmx.de>
+	for suggestions and testing around early versions 
+kristian orlopp <orlopp@lmb.uni-muenchen.de>
+	missing Debian dependency on libdbd-pg-perl (if ODBC is not used)
+Horst.Timmermann@t-online.de (Horst Timmermann)
+	for spotting a buglet in setup_beancounter in the 0.2.0 release
+Adrian Johnson <asj@bigpond.net.au>
+        for spotting this and a few more buglets in 0.2.0 leading to 0.2.1
+
+and all the kind folks who dropped a line to either report a bug, and/or 
+say that they liked the program... 

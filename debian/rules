@@ -27,6 +27,7 @@ update:
 		$(srcdir)/TODO	 		\
 		$(srcdir)/Makefile.PL 		\
 		$(srcdir)/setup_beancounter	\
+		$(srcdir)/example.beancounterrc \
 		$(srcdir)/update_beancounter		.
 
 webdir:
@@ -70,12 +71,13 @@ binary-indep: build
 	$(MAKE) 		prefix=$(debtmp)/usr pure_install
 	dh_perl	
 	dh_installdocs		
-#	dh_installexamples	setup_beancounter 
+	dh_installexamples	example.beancounterrc 
 #	dh_installmenu
 #	dh_installinit
 #	dh_installcron
 	dh_installmanpages	
-	dh_undocumented		setup_beancounter.1
+	dh_undocumented		setup_beancounter.1 update_beancounter.1
+	dh_installmanpages	
 	dh_installchangelogs	
 	dh_compress
 	dh_fixperms

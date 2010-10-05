@@ -7,7 +7,7 @@ Build-Depends: debhelper
 
 Package: beancounter
 Architecture: all
-Depends: ${perl:Depends}, libwww-perl, libhtml-parser-perl, libdate-manip-perl, libdbi-perl, libdbd-pg-perl | libdbd-odbc-perl, postgresql-client
+Depends: ${perl:Depends}, libwww-perl, libhtml-parser-perl, libdate-manip-perl, libdbi-perl, libdbd-pg-perl, libdbd-odbc-perl, postgresql-client
 Description: A stock portfolio performance monitoring tool
  This package provides beancounter, a tool to quantify gains and losses in
  stock portfolios, as well as the BeanCounter Perl module that underlies it. 

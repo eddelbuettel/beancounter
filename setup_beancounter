@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.3 2000/08/18 03:11:30 edd Exp $
+#   $Id: setup_beancounter,v 1.6 2001/02/10 20:16:01 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -157,7 +157,7 @@ function exit_if_root()
 function exit_if_no_postgres_user()
 {
     set +e
-    $PSQL -c "select * from pg_user;" >/dev/null 2>&1 
+    ( psql -q -c "select * from pg_user;" | grep -v $1 ) >/dev/null 2>&1 
     if [ $? -eq 1 ]
     then
 	echo ""
@@ -207,15 +207,15 @@ echo "Filling BeanCounter database tables with DJIA stocks"
 execute "beancounter addindex DJIA $DJIA"
 
 # create an example of Dow stocks
-echo "Filling BeanCounter (sample) portfolio with DJIA stocks"
-execute "beancounter addportfolio CSCO:20:USD NT.TO:20:CAD"
+echo "Filling BeanCounter (sample) portfolio"
+execute "beancounter addportfolio CSCO:20:USD NT:20:USD"
 
 echo -n "Filling BeanCounter with stock info and most recent prices "
 echo "for DJIA stocks"
 execute "beancounter addstock $DJIA"
 
 echo "Filling BeanCounter with historical prices for DJIA stocks"
-execute "beancounter backpopulate --fromdate '1 year ago' --todate 'friday 1 week ago' CSCO NT.TO"
+execute "beancounter backpopulate --prevdate '1 year ago' --date 'friday 1 week ago' CSCO NT"
 
 echo "Running portfolio report on (sample) portfolio"
 execute "beancounter plreport --prevdate 'friday 4 weeks ago' --date 'friday 1 week ago'"

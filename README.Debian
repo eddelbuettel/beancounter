@@ -3,6 +3,9 @@
 
 On a Debian system, the following steps are required for beancounter to run:
 
+0. In case you are upgrading from an older installation of beancounter,
+   run the script update_beancounter to add some columns to the tables.
+
 1. Install PostgreSQL (if it is not yet installed)
 
       root# apt-get install postgresql
@@ -29,7 +32,7 @@ On a Debian system, the following steps are required for beancounter to run:
       createuser: edd was successfully added
 
    Note that the superuser rights might not be required, however it is
-   *important* to use the -d option to createuser
+   *important* to use the -d option to createuser. 
 
 4. Configure postgres to allow TCP/IP connections by uncommenting the 
    following line in /etc/postgresql/postmaster.init:
@@ -49,11 +52,12 @@ On a Debian system, the following steps are required for beancounter to run:
        Unpacking beancounter (from beancounter_0.1.0_all.deb) ...
        Setting up beancounter (0.1.0) ...
 
-6. As the user running beancounter, run 'setup_beancounter'
+6. As the user running beancounter, run 'setup_beancounter' to initialise
+   the tables and run an example report.
 
 7. That's it! 
 
-As of November 2000, I have yet to test it on a current Debian 'unstable'
+As of February 2001, I have yet to test it on a current Debian 'unstable'
 release (with release-number-to-be 2.3 and codename 'woody'). There might be
 issues with Postgresql 7.* that I am not yet aware of. If the reader of these
 lines finds any, I would appreciate an email, preferably with some examples.
