@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.82 2005/04/14 02:46:54 edd Exp $
+#  $Id: BeanCounter.pm,v 1.85 2005/06/11 00:46:00 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -72,7 +72,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.82 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.85 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -1136,8 +1136,8 @@ sub DatabaseHistoricalData {
 	($date, $open, $high, $low, $close, $volume, $adjclose) = 
 	  split(/\,/, $ARG);
 	$date = UnixDate(ParseDate($date), "%Y%m%d");
-        if ( $adjclose != $close ) { # process split adjustment factor
-	  $split_adj = ($adjclose / $close);
+        if ( $adjclose != $close && $close != 0 ) { # process split adjustment factor
+          my $split_adj = ($adjclose / $close);
 	  %data = (symbol    => $symbol,
 		   date      => $date,
 		   day_open  => $open * $split_adj,
@@ -1432,10 +1432,13 @@ sub ParseDailyData {		# stuff the output into the hash
     $hash{$key}{dividend_per_share} = $ra->[18];
     $hash{$key}{yield} = $ra->[19];
     if ($ra->[20] =~ m/(\S*)B$/) {
-      $hash{$key}{market_capitalisation} = $1*(10e3); # keep it in millions
-    } elsif ($ra->[20] =~ m/(\S*)M/) {
-      $hash{$key}{market_capitalisation} = $1*(10e0); # keep it in millions
+      # convert to millions from billions
+      $hash{$key}{market_capitalisation} = $1*(1e3);
+    } elsif ($ra->[20] =~ m/(\S*)M$/) {
+      # keep it in millions
+      $hash{$key}{market_capitalisation} = $1;
     } else {
+      # it's not likely a number at all -- pass it on
       $hash{$key}{market_capitalisation} = $ra->[20];
     }
     $hash{$key}{exchange}  	= RemoveTrailingSpace($ra->[21]);

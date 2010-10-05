@@ -1,3 +1,24 @@
+beancounter (0.8.2) unstable; urgency=low
+
+  * Minor update containing a few extensions and fixes 
+
+    o [beancounter] New command-line option --splitby  to 
+      split-adjust historical data 
+  
+    o [BeanCounter.pm] Additional test adjusted-close series to
+      ensure adjusted close and close series are non-zero.
+
+    o [BeanCounter.pm] Correction to market-cap display for smaller stocks
+
+    o [setup_beancounter] Example portfolio simplified to US-only to
+      avoid continued unavailability of FX quotes at Yahoo!
+  
+    o [debian/copyright] Updated source URL to dirk.eddelbuettel.com
+  
+    o [MANIFEST] Include debian/copyright
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Sat, 24 Sep 2005 21:16:40 -0500
+
 beancounter (0.8.1) unstable; urgency=low
 
   * Minor update release which adds support for SQLite3

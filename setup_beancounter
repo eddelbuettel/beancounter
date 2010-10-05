@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.35 2005/04/14 03:19:33 edd Exp $
+#   $Id: setup_beancounter,v 1.38 2005/09/18 02:02:45 edd Exp $
 
 #  If we really want to be independent of the underlying database, this 
 #  probably needs to written in Perl using DBI/DBD
@@ -45,11 +45,6 @@
 
 # -------------------------- 'global' variables
 
-# make sure we get this beancounter first
-#echo "DEVELOPMENT VERSION"
-#export PATH=".:$PATH"
-#echo "Using local path: $PATH"
-
 progname=$(basename $0)
 
 if [ "$USER" = "" ]
@@ -58,7 +53,7 @@ then
 fi
 
 DATABASE='beancounter'
-VERSION='0.8.1'
+VERSION='0.7.5'
 DBSYSTEM='PostgreSQL'
 #DBSYSTEM='MySQL'
 SCHEMA_ONLY=0
@@ -595,14 +590,16 @@ execute "$BEANCOUNTER addindex DJIA $DJIA"
 
 # create an example of tech stocks
 echo "Filling $DATABASE (sample) portfolio"
-execute "$BEANCOUNTER addportfolio CSCO:50:USD NT.TO:100:CAD SIEGn.DE:10:EUR CGEP.PA:50:EUR"
+#execute "$BEANCOUNTER addportfolio CSCO:50:USD NT.TO:100:CAD SIE.DE:10:EUR CGE.PA:50:EUR"
+execute "$BEANCOUNTER addportfolio IBM:50:USD XOM:75:USD C:100:USD GOOG:25:USD"
 
 echo -n "Filling $DATABASE with stock info and most recent prices "
 echo "for DJIA stocks"
 execute "$BEANCOUNTER addstock $DJIA"
 
 echo "Filling $DATABASE with historical prices for example portfolio stocks"
-execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' CSCO NT.TO SIEGn.DE CGEP.PA"
+#execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' CSCO NT.TO SIE.DE CGE.PA"
+execute "$BEANCOUNTER backpopulate --prevdate '1 year ago' --date '$LASTBIZDAY' IBM XOM C GOOG"
 
 echo "Filling $DATABASE with historical fx prices for EUR and CAD"
 execute "$BEANCOUNTER fxbackpopulate --prevdate '1 year ago'  --date '$LASTBIZDAY' EUR CAD"

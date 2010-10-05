@@ -19,4 +19,5 @@ update_beancounter
 t/01base.t
 contrib/getDiv
 contrib/schnapp
+debian/changelog
 META.yml                                 Module meta-data (added by MakeMaker)

@@ -31,6 +31,7 @@ Thomas Walter
 Robert A. Schmied
         for a thoughtful set of patches to beancounter, BeanCounter.pm
 	setup_beancounter and update_beancounter. First Grand Slam winner :)
+	And even more so for continued suggestions, testing and patches.
 Mike Castle
         for a patch with more consistent upper/lower case use in BeanCounter
 Joao Pedro
@@ -47,6 +48,8 @@ Matthew Jurgens
 Oliver Muth
         for noticing that beancounter still used 'password' in the docs
         for the optional 'passwd' argument for db connections
+Rene Cunningham 
+        for a patch to prevent a division-by-zero if adjusted close was zero
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 

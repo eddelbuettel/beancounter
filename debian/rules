@@ -43,13 +43,15 @@ update:
 	for i in setup_beancounter update_beancounter; do \
 	   perl -p -i -e "s/VERSION='.*'/VERSION='"$(version)"'/" $$i; \
 	done
+	make 
+
+perlrelease:
 	perl -p -i -e \
-		"s/'VERSION'	\t=> '0.7.5'/'VERSION'\t\t=> '"$(version)"'/"\
+		"s/'VERSION'	\t=> '\d.\d.\d'/'VERSION'\t\t=> '"$(version)"'/"\
 		Makefile.PL 
 	perl Makefile.PL
 	make dist
 	mv -v Finance-BeanCounter-$(version).tar.gz ..
-
 
 oldwebdir:
 ifneq ($(host),sonny)
@@ -86,6 +88,7 @@ ifneq ($(host),basebud)
 		@echo "This needs to run on basebud"
 		false
 endif
+	cp -vax /var/local/cache/pbuilder/result/$(package)_$(version)_all.deb ..
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
 		cd /tmp; \
 		fakeroot alien -r $(package)_$(version)_all.deb; \

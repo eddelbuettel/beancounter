@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.72 2005/04/14 04:36:58 edd Exp $
+#   $Id: beancounter,v 1.73 2005/06/10 03:49:20 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -30,21 +30,21 @@ use Getopt::Long;		# long options
 use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg 
 	    $rcfile $sqlrestriction $extrafx $updatedate
 	    $dbsystem $dbname $fxupdate $commit $equityupdate
-	    $pacificfx);
+	    $pacificfx $splitby);
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.72 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.73 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.1";		# updated from the debian/rules Makefile
+my $version = "0.8.2";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2005/04/14 04:36:58 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2005/06/10 03:49:20 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
-($prevdatearg, $datearg, $equityupdate, $fxupdate, $commit, $pacificfx) = 
-    ("6 month ago", "today", 1, 1, 1, 0);
+($prevdatearg, $datearg, $equityupdate, $fxupdate, $commit, $pacificfx, $splitby) = 
+    ("6 month ago", "today", 1, 1, 1, 0, 2);
 
 my %options = ("help" 		=> \$help,
 	       "debug"		=> \$debug,
@@ -60,6 +60,7 @@ my %options = ("help" 		=> \$help,
 	       "forceupdate=s"	=> \$updatedate,
 	       "fxupdate!"	=> \$fxupdate,
 	       "equityupdate!"	=> \$equityupdate,
+	       "splitby=s"	=> \$splitby,
 	       "pacificfx!"	=> \$pacificfx,
 	       "verbose"	=> \$verbose);
 
@@ -126,6 +127,8 @@ if (TestInsufficientDatabaseSchema($dbh, $db_min_schema)) {
     lsportfolio($sqlrestriction);
   } elsif ($command =~ /^deactivate$/) {
     inactive_stock(@ARGV);
+  } elsif ($command =~ /^split$/) {
+    split_stock(@ARGV);
   } elsif ($command =~ /^checkdbconnection$/) {
     CloseDB($dbh) or die("Cannot close db handle!\n");
     print "Successfully connected to database from beancounter script.\n"
@@ -182,6 +185,7 @@ Commands:
     retracement			report unreal. losses from highs (drawdowns)
     quote arg ...		report current data for given stock(s)
     risk			display a portfolio risk report 
+    split arg ...               split-adjust price history and portfolio
     status			status report for a given date
     update			update the database with current day's data
     warranty			display short GNU GPL statement
@@ -199,6 +203,7 @@ Options:
     --[no]commit	        enforce/suppress database update [commit]
     --[no]equityupdate 		enforce/suppress Equity update, [update]
     --[no]pacificfx 		use/skip FX from UBC's Sauder school [skip]
+    --splitby arg               split stock history and position by this factor [2]
     --rcfile file		use different configuration file
     --dbsystem system		use db backend system, default is PostgreSQL
     --dbname name		use db name, default is beancounter
@@ -211,6 +216,7 @@ Examples:
     beancounter fxbackpopulate EUR --prevdate 20010101 --date yesterday
     beancounter dayendreport --restriction \"type = '401k'\"
     beancounter status --date 20000816 --restriction \"currency='USD'\"
+    beancounter split --splitby 3 --prevdate 1990-01-01 ABC CDE
 
 \n";
   exit 1;
@@ -414,6 +420,89 @@ sub display_riskreport {
   printf("$tl\n");
 }
 
+sub split_stock {
+  my @arg = @_;
+
+  my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
+    = GetTodaysAndPreviousDates();
+
+  print "Splitting stockprices by $splitby from $prev_date to $date:";
+  my $stmt  = qq{select date, previous_close, day_open, day_low, day_high, day_close, 
+                        bid, ask, volume
+	         from stockprices 
+	         where symbol = ? 
+	         and date <= ? 
+	         and date >= ?
+	         and day_close > 0
+	         order by date
+	        };
+  print "split_stock():\n\$stmt = $stmt\n" if $Config{debug};
+  my $sth = $dbh->prepare($stmt);
+
+  foreach my $arg (sort @arg) {
+    print " $arg ";
+    my $rv = $sth->execute($arg, $date, $prev_date);
+    my $dr = $sth->fetchall_arrayref;	# get data
+    for (my $i=0; $i<scalar(@{$dr}); $i++) { # add returns
+      my $cmd = "update stockprices set";
+      $cmd.= " previous_close = $dr->[$i][1]/$splitby," 
+	if defined($dr->[$i][1]);
+      $cmd.= " day_open = $dr->[$i][2]/$splitby," 
+	if defined($dr->[$i][2]);
+      $cmd.= " day_low = $dr->[$i][3]/$splitby," 
+	if defined($dr->[$i][3]);
+      $cmd.= " day_high = $dr->[$i][4]/$splitby," 
+	if defined($dr->[$i][4]);
+      $cmd.= " day_close = $dr->[$i][5]/$splitby," 
+	if defined($dr->[$i][5]);
+      $cmd.= " bid = $dr->[$i][6]/$splitby," 
+	if defined($dr->[$i][6]);
+      $cmd.= " ask = $dr->[$i][7]/$splitby," 
+	if defined($dr->[$i][7]);
+      $cmd.= " volume = $dr->[$i][8]*$splitby," 
+	if defined($dr->[$i][8]);
+      $cmd.= "where symbol     = '$arg' ";
+      $cmd.= "and date         = '$dr->[$i][0]'";
+      $cmd =~ s/,where/ where/;
+      print "$cmd\n" if $Config{debug};
+      if ($Config{commit}) {
+	$dbh->do($cmd) or warn "Failed for $arg with $cmd\n";
+	$dbh->commit();
+      }
+    }
+  }
+  print " Done.\n";
+
+  print "Adjusting portfolio by $splitby:";
+  $stmt  = qq{select shares, cost
+	      from portfolio 
+              where symbol = ?
+             };
+  print "split_stock():\n\$stmt = $stmt\n" if $Config{debug};
+  $sth = $dbh->prepare($stmt);
+
+  foreach my $arg (sort @arg) {
+    print " $arg ";
+    my $rv = $sth->execute($arg);
+    my $dr = $sth->fetchall_arrayref;	# get data
+    for (my $i=0; $i<scalar(@{$dr}); $i++) { # add returns
+      my $cmd = "update portfolio set";
+      $cmd.= " shares = $dr->[$i][0]*$splitby,";
+      $cmd.= " cost = $dr->[$i][1]/$splitby," 
+	if defined($dr->[$i][1]);
+      $cmd.= "where symbol  = '$arg' ";
+      $cmd.= "and   shares  = '$dr->[$i][0]' ";
+      $cmd.= "and   cost    = '$dr->[$i][1]' " if defined($dr->[$i][1]);
+      $cmd =~ s/,where/ where/;
+      print "$cmd\n" if $Config{debug};
+      if ($Config{commit}) {
+	$dbh->do($cmd) or warn "Failed for $arg with $cmd\n";
+	$dbh->commit();
+      }
+    }
+  }
+  print " Done.\n";
+}
 
 sub lsportfolio {
   my @arg = @_;
@@ -917,6 +1006,7 @@ beancounter [options] command [command_arguments ...]
  quote arg ...             report current data for given stock(s)
  retracement  		   report unrealized losses from highs (drawdowns)
  risk			   display a portfolio risk report
+ split arg ...             split-adjust price history and portfolio
  status			   status summary report for portfolio
  update                    update the database with day's data
  warranty		   display the short GNU GPL statement
@@ -936,6 +1026,7 @@ beancounter [options] command [command_arguments ...]
  --[no]commit	  	   enforce/suppress database update, default is commit
  --[no]equityupdate        enforce/suppress Equity update, default is update
  --[no]pacificfx    	   use/skip FX from UBC's Sauder school, default skip
+ --splitby arg             split stock history and position by this factor [2]
  --dbsystem system         use db backend system, default is PostgreSQL
  --dbname name	           use db name, default is beancounter
 
@@ -1043,6 +1134,14 @@ installed, as as long as the database backend is found.
     report, show a portfolio status report and show a riskreport. In the
     update mode, override a potentially wrong date supplied by Yahoo!
     with the current date.
+
+ beancounter split --splitby 3 --prevdate 1990-01-01 ABC CDE
+
+    Split-adjusts the (hypothetical) stocks ABC and CDE by a factor
+    of three: price data in the database is divided by three, volume
+    increased by 3 and similarly, in the portfolio shares are increased
+    and cost is descreased.  Default dates are --prevdate and --date
+    which may need adjusting.
 
 =head1 TUTORIAL
 
@@ -1204,6 +1303,11 @@ The existing data for symbol(s) is retained. Use this when a stock is
 acquired, delisted, or you simply want to stop tracking it -- but do 
 not want to purge the historical data.
 
+B<split> adjusts the price database, and the portfolio holdings, for 
+stock splits.  The default factor is 2, this can be adjusted with the
+option B<--splitby>. The dates arguments can be set with B<--prevdate>
+and B<--date>.
+
 B<delete> removes the given symbols from the database.
 
 B<destroydb> deletes the BeanCounter database.
@@ -1279,6 +1383,9 @@ from the Sauder School at UBC. This is useful when the default FX rate
 service at Yahoo! is erratic, or unreliable. The Yahoo! is still the 
 default as it provide more columns (open/high/low). However, the PACIFIC
 server provides a wider variety of exchange rates.
+
+B<--splitby> can be used to set a stock split factor other than the default
+of 2.
 
 Also, B<--commit> is a boolean switch to suppress actual database
 updates if the negated B<--nocommit> is selected. This is useful
