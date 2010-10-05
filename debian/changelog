@@ -1,3 +1,18 @@
+beancounter (0.8.10) unstable; urgency=low
+
+  * Minor bugfix releases:
+
+    o manual page confused --dbname and --dbsystem	(Closes: #573235)
+
+    o applied patch by Warren Thompson to use the registered default
+      currency rather than a hard-code 'USD' 
+  
+  * debian/control: Standards-Version: increased to 3.8.4
+  * debian/source/format: Added with "3.0 (native)"
+  * debian/rules: Updated Perl invocation  
+  
+ -- Dirk Eddelbuettel <edd@debian.org>  Sun, 13 Jun 2010 17:24:30 -0500
+
 beancounter (0.8.9) unstable; urgency=low
 
   * Minor bugfix releases:

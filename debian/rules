@@ -1,7 +1,7 @@
 #! /usr/bin/make -f
 #                                                       -*- makefile -*-
 # debian/rules file for the Debian/GNU Linux beancounter package
-# Copyright (C) 2001 - 2007 by Dirk Eddelbuettel <edd@debian.org>
+# Copyright (C) 2001 - 2010 by Dirk Eddelbuettel <edd@debian.org>
 
 package	:= $(shell grep Package debian/control | sed 's/^Package: //')
 version	:= $(shell head -1 debian/changelog | \
@@ -17,8 +17,8 @@ host	:= $(shell hostname)
 #export DH_VERBOSE=1
 
 update:
-ifneq ($(host),ron)
-		@echo "This needs to run on ron"
+ifneq ($(host),max)
+		@echo "This needs to run on max"
 		false
 endif
 	cp -vaf	$(srcdir)/BeanCounter.pm 			\
@@ -38,7 +38,7 @@ endif
 		$(srcdir)/update_beancounter			\
 		$(srcdir)/contrib/				\
 		$(srcdir)/t/					.
-	@echo "********* Now run updatebuild on ron"
+	@echo "********* Now run updatebuild on max"
 
 updatebuild:
         # update the $$version field in the perl code as well as in
@@ -56,41 +56,11 @@ updatebuild:
 	mv -v Finance-BeanCounter-$(version).tar.gz ..
 
 webdir:
-ifneq ($(host),ron)
-		@echo "This needs to run on ron"
+ifneq ($(host),max)
+		@echo "This needs to run on max"
 		false
 endif
 	cp -vax /var/cache/pbuilder/result/$(package)_$(version)_all.deb ..
-	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
-		cd /tmp; \
-		fakeroot alien -r $(package)_$(version)_all.deb; \
-		fakeroot mv $(package)-$(version)-2.noarch.rpm \
-			$(package)-$(version).noarch.rpm; \
-		cd - ; \
-		mv /tmp/$(package)-$(version).noarch.rpm . )
-	cp -af  ../$(package)_$(version).tar.gz  \
-		../$(package)_$(version)_all.deb \
-		../$(package)-$(version).noarch.rpm \
-		TODO				 \
-	        debian/changelog		 \
-		beancounter.html		 \
-		BeanCounter.html		$(webdir)
-	(cd $(webdir); \
-		mv changelog ChangeLog;			\
-		ln -sfv	$(package)_$(version).tar.gz 	\
-			$(package)-current.tar.gz ;  	\
-		ln -sfv	$(package)_$(version)_all.deb 	\
-			$(package)-current.deb	;	\
-		ln -sfv	$(package)-$(version).noarch.rpm \
-			$(package)-current.rpm	;	\
-		ln -sfv ChangeLog ChangeLog.txt	;	\
-		ln -sfv TODO TODO.txt 			)
-
-oldwebdir:
-ifneq ($(host),sonny)
-		@echo "This needs to run on sonny"
-		false
-endif
 	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
 		cd /tmp; \
 		fakeroot alien -r $(package)_$(version)_all.deb; \
@@ -143,7 +113,7 @@ binary-indep: build
         #dh_installdirs		usr/bin usr/share/man/man1
         #dh_installdirs		usr/bin 
         #$(MAKE) 		prefix=$(debtmp)/usr pure_install
-	$(MAKE) 		install PREFIX=$(debtmp)/usr
+	$(MAKE) 		install DESTDIR=$(debtmp)
 	dh_perl	
 	dh_installdocs		THANKS TODO README README.Debian \
 				README.non-gnu

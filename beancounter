@@ -3,7 +3,7 @@
 #
 #   beancounter --- A stock portfolio performance monitoring tool
 #
-#   Copyright (C) 1998 - 2009  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 1998 - 2010  Dirk Eddelbuettel <edd@debian.org>
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.90 2009/12/23 02:10:14 edd Exp $
+#   $Id: beancounter,v 1.92 2010/06/13 21:55:54 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
@@ -34,12 +34,12 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.90 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.92 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.8.9";		# updated from the debian/rules Makefile
+my $version = "0.8.10";		# updated from the debian/rules Makefile
 my $db_min_schema = "0.6.0";	# minimum version of the database that we need
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2009/12/23 02:10:14 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2010/06/13 21:55:54 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -215,9 +215,9 @@ Options:
 
 Examples:
     beancounter update --forceupdate today
-    beancounter addportfolio SUNW:100:USD:401k:joe:14.10:20011205 VOD.L:50:GBP
+    beancounter addportfolio IBM:100:USD:401k:joe:121.4:20011205 VOD.L:50:GBP
     beancounter addstock CBOT LNUX RHAT COR.TO
-    beancounter backpopulate MSFT SUNW --prevdate 19940101 --date 19981231
+    beancounter backpopulate MSFT IBM --prevdate 19940101 --date 19981231
     beancounter fxbackpopulate EUR --prevdate 20010101 --date yesterday
     beancounter dayendreport --restriction \"type = '401k'\"
     beancounter status --date 20000816 --restriction \"currency='USD'\"
@@ -1249,14 +1249,13 @@ installed, as as long as the database backend is found.
     the --restriction argument will be applied to the portfolio table,
     whereas the overall selection comes from the stockinfo table.
 
- beancounter addportfolio SUNW:100:USD:401k:joe:85.50:19991117 \
-                          IBM:100:USD:401k:joe:90.25:20000320  \
+ beancounter addportfolio IBM:100:USD:401k:joe:90.25:20000320  \
                           SPY:50:USD:ira:joe:142.25:20000620
 
-    This adds the two stocks Sun and IBM to the 401k portfolio of Joe,
-    as well as SP500 'Spiders' to his IRA portfolio. The stocks are
-    also added to the general stock info tables via an implicit call
-    of the stockinfo command.
+    This adds IBM to the 401k portfolio of Joe, as well as SP500
+    'Spiders' to his IRA portfolio. The stocks are also added to the
+    general stock info tables via an implicit call of the stockinfo
+    command.
 
  beancounter addstock LNUX RHAT COR.TO
 
@@ -1264,7 +1263,7 @@ installed, as as long as the database backend is found.
     them to any specific portfolios.
 
  beancounter backpopulate --prevdate '1 year ago' \
-                          --date 'friday 1 week ago' IBM SUNW HWP
+                          --date 'friday 1 week ago' IBM MSFT HWP
 
     This backpopulates the database with historic prices for three
     hardware companies. Note how the date specification is very general
@@ -1327,10 +1326,10 @@ We suppose that B<beancounter> is installed and that the
 B<setup_beancounter> command has been run. We can then create a
 two-stock (computer hardware) portfolio for Bob as follows:
 
- beancounter addportfolio SUNW:100:USD:401k:bob:85.50:19991117 \
+ beancounter addportfolio SPY:50:USD:401k:bob:142.25:20000620 \
                           IBM:100:USD:401k:bob:90.25:20000320
 
-Here we specify that 100 shares each of Sun and IBM, priced in US
+Here we specify that 100 shares each of SPY and IBM, priced in US
 Dollars, are in Bob's portfolio which is tagged as a 401k retirement
 account. The (fictitious) purchase price and date are also given.
 
@@ -1338,11 +1337,11 @@ Let's suppose that Bill prefers networking equipment, and that he has
 a brokerage account in Canada:
 
  beancounter addportfolio CSCO:100:USD:spec:bill:78.00:19990817 \
-                          NT:200:CAD:spec:bill:cad:90.25:20000212
+                          NT.TO:200:CAD:spec:bill:cad:90.25:20000212
 
 Now we can backpopulate the database from 1998 onwards for all four stocks:
 
- beancounter backpopulate --prevdate 19980101 CSCO IBM NT SUNW
+ beancounter backpopulate --prevdate 19980101 CSCO IBM NT.TO SPY
 
 With this historical data in place, we now compare how Bob's portfolio
 would have fared over the last 18 months:
@@ -1539,7 +1538,7 @@ supported. For B<SQLite>, the default is now version 3.* but the
 previous version -- which is not binarily compatible -- is supported
 as well with argument 'SQLite2'.
 
-B<--dbsystem> allows to switch to an alternate database. The default
+B<--dbname> allows to switch to an alternate database. The default
 is 'beancounter'. This can be useful for testing new features.
 
 B<--fxupdate> is a boolean switch to enforece updates of FX rates during
@@ -1624,7 +1623,7 @@ if needed.
 PostgreSQL to MySQL or SQLite or SQLite2 (the previous format of
 SQLite).
 
-=item I<dbsystem> to select a different default database name other
+=item I<dbname> to select a different default database name other
 than the default of 'beancounter'
 
 =item I<proxy> to specify the address of a firewall proxy server if

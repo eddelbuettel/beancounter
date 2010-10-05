@@ -1,7 +1,7 @@
 #
 #  BeanCounter.pm --- A stock portfolio performance monitoring toolkit
 #
-#  Copyright (C) 1998 - 2009  Dirk Eddelbuettel <edd@debian.org>
+#  Copyright (C) 1998 - 2010  Dirk Eddelbuettel <edd@debian.org>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.105 2009/12/23 02:00:41 edd Exp $
+#  $Id: BeanCounter.pm,v 1.107 2010/06/13 22:13:09 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -77,7 +77,7 @@ use Text::ParseWords;		# parse .csv data more reliably
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.105 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.107 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
@@ -666,7 +666,7 @@ sub GetFXData {
   my %fxdates;
   my $sth;
   foreach my $fxval (sort values %$fx) {
-    next if $fxval eq 'USD';	# skip USD
+    next if $fxval eq $Config{currency};# skip user's default currency
     if (!defined($sth)) {
       $sth = $dbh->prepare($stmt);
     }
@@ -685,7 +685,7 @@ sub GetFXData {
   $sth = undef;
   my (%fx_prices,%prev_fx_prices);
   foreach my $fxval (sort values %$fx) {
-    if ($fxval eq 'USD') {	
+    if ($fxval eq $Config{currency}) {	
       $fx_prices{$fxval} = 1.0;
       $prev_fx_prices{$fxval} = 1.0;
     } else {
