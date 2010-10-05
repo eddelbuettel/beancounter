@@ -2,7 +2,7 @@
 #
 #   beancounter --- A stock portfolio performance monitoring tool
 #
-#   Copyright (C) 1998 - 2001  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 1998 - 2002  Dirk Eddelbuettel <edd@debian.org>
 #
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,12 +18,13 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: beancounter,v 1.28 2001/10/15 01:48:58 edd Exp $
+#   $Id: beancounter,v 1.31 2002/03/02 04:19:22 edd Exp $
 
 # adjust @INC to let the current development version be found first
 BEGIN { @INC = ( ".", @INC ) }
 
 use strict;			# be careful out there, son
+use Data::Dumper;
 use Date::Manip;		# general date parsing / calcs
 use English;			# explicit variable names
 use Getopt::Long;		# long options
@@ -33,11 +34,11 @@ use vars qw($help $debug $verbose $fxarg $datearg $prevdatearg
 
 use Finance::BeanCounter;	# beancounter functions
 
-my $rcsversion = sprintf("%d.%d", q$Revision: 1.28 $ =~ /(\d+)\.(\d+)/); 
+my $rcsversion = sprintf("%d.%d", q$Revision: 1.31 $ =~ /(\d+)\.(\d+)/); 
 
-my $version = "0.4.0";		# updated from the debian/rules Makefile
+my $version = "0.1.9";		# updated from the debian/rules Makefile
 my $date =			# inner expression below is updated by RCS
-  sprintf("%s", q$Date: 2001/10/15 01:48:58 $ =~ /\w*: (\d*\/\d*\/\d*)/);
+  sprintf("%s", q$Date: 2002/03/02 04:19:22 $ =~ /\w*: (\d*\/\d*\/\d*)/);
 
 my $rcfile = $ENV{HOME} . "/.beancounterrc";
 
@@ -67,43 +68,51 @@ my %Config = GetConfig($rcfile, $debug, $verbose, $fxarg,
 		       $fxupdate, $command);
 my $dbh = ConnectToDb();
 
-if ($command =~ /^plreport$/) {
-  portfolio_report($sqlrestriction);
-} elsif ($command =~ /^backpopulate$/) {
-  backpopulate(@ARGV);
-} elsif ($command =~ /^addindex$/) {
-  add_index(@ARGV);
-} elsif ($command =~ /^addstock$/) {
-  add_stock(@ARGV);
-} elsif ($command =~ /^addportfolio$/) {
-  add_portfolio(@ARGV);
-} elsif ($command =~ /^allreports$/) {
-  day_end_report($sqlrestriction);
-  portfolio_status($sqlrestriction);
-  portfolio_risk($sqlrestriction);
-} elsif ($command =~ /^dayendreport$/) {
-  day_end_report($sqlrestriction);
-} elsif ($command =~ /^dailyjob$/) {
-  portfolio_update($sqlrestriction);
-  day_end_report($sqlrestriction);
-  portfolio_status($sqlrestriction);
-  portfolio_risk($sqlrestriction);
-} elsif ($command =~ /^delete$/) {
-  delete_stock(@ARGV);
-} elsif ($command =~ /^destroydb$/) {
-  deletedb(@ARGV);		# does not return
-} elsif ($command =~ /^quote$/) {
-  quote(@ARGV);
-} elsif ($command =~ /^risk$/) {
-  portfolio_risk($sqlrestriction);
-} elsif ($command =~ /^status$/) {
-  portfolio_status($sqlrestriction);
-} elsif ($command =~ /^update$/) {
-  portfolio_update($sqlrestriction);
-} elsif ($command =~ /^warranty$/) {
-  warranty();
+if (InsufficientDatabaseSchema($dbh, $version)) {
+  warn "Database schema is not current. Please run 'update_beancounter'\n";
 } else {
-  warn "Ignoring unknown command '$command'";
+  if ($command =~ /^plreport$/) {
+    portfolio_report($sqlrestriction);
+  } elsif ($command =~ /^backpopulate$/) {
+    backpopulate(@ARGV);
+  } elsif ($command =~ /^addindex$/) {
+    add_index(@ARGV);
+  } elsif ($command =~ /^addstock$/) {
+    add_stock(@ARGV);
+  } elsif ($command =~ /^addportfolio$/) {
+    add_portfolio(@ARGV);
+  } elsif ($command =~ /^advancement$/) {
+    portfolio_retracement($sqlrestriction, "advance");
+  } elsif ($command =~ /^allreports$/) {
+    day_end_report($sqlrestriction);
+    portfolio_status($sqlrestriction);
+    portfolio_risk($sqlrestriction);
+  } elsif ($command =~ /^dayendreport$/) {
+    day_end_report($sqlrestriction);
+  } elsif ($command =~ /^dailyjob$/) {
+    portfolio_update($sqlrestriction);
+    day_end_report($sqlrestriction);
+    portfolio_status($sqlrestriction);
+    portfolio_risk($sqlrestriction);
+  } elsif ($command =~ /^delete$/) {
+    delete_stock(@ARGV);
+  } elsif ($command =~ /^destroydb$/) {
+    deletedb(@ARGV);		# does not return
+  } elsif ($command =~ /^quote$/) {
+    quote(@ARGV);
+  } elsif ($command =~ /^retracement$/) {
+    portfolio_retracement($sqlrestriction, "retrace");
+  } elsif ($command =~ /^risk$/) {
+    portfolio_risk($sqlrestriction);
+  } elsif ($command =~ /^status$/) {
+    portfolio_status($sqlrestriction);
+  } elsif ($command =~ /^update$/) {
+    portfolio_update($sqlrestriction);
+  } elsif ($command =~ /^warranty$/) {
+    warranty();
+  } else {
+    warn "Ignoring unknown command '$command'\n";
+  }
 }
 
 CloseDB($dbh);
@@ -118,7 +127,7 @@ sub help_and_exit {
 beancounter -- A stock portfolio performance monitoring tool
 
 beancounter version $version (RCS $rcsversion and $pmVersion) of $date
-Copyright (C) 1998 - 2001 by Dirk Eddelbuettel <edd\@debian.org>
+Copyright (C) 1998 - 2002 by Dirk Eddelbuettel <edd\@debian.org>
 beancounter comes with ABSOLUTELY NO WARRANTY. This is free software, 
 and you are welcome to redistribute it under certain conditions. 
 Please try '$PROGRAM_NAME warranty' for more details, or visit the
@@ -132,9 +141,10 @@ Commands:
 				add stock(s) to market index 'index' 
     addportfolio symbol:nb:fx[:type:owner:date:price] [...]	
                                 add n stock of s in currency fx to portfolio
-				optional type, owner, purchase date and
-                                price info can also be given (see example)
+				optional type, owner, purchase price and
+                                purch. date can also be given (see example)
     addstock symbol ...		add stock(s) to database 
+    advanceement  	        report unrealized gains from lows
     allreports			combines, dayendreport, status and risk
     backpopulate  symbol ...	fill with historic data for given stock(s)
     dailyjob			combines update, dayendreport, status + risk
@@ -142,6 +152,7 @@ Commands:
     delete arg ...		delete given stock(s) from database
     destroydb			delete the BeanCounter database
     plreport			p/l portfolio report against any other day
+    retracement			report unreal. losses from highs (drawdowns)
     quote arg ...		report current data for given stock(s)
     risk			display a portfolio risk report 
     status			status report for a given date
@@ -164,7 +175,7 @@ Options:
 
 Examples:
     beancounter update --forceupdate today
-    beancounter addportfolio SUNW:100:USD:401k:joe VOD.L:50:GBP
+    beancounter addportfolio SUNW:100:USD:401k:joe:14.10:20011205 VOD.L:50:GBP
     beancounter addstock CBOT LNUX RHAT COR.TO
     beancounter backpopulate MSFT SUNW --prevdate 19940101 --date 19983112
     beancounter dayendreport --restriction \"type = '401k'\"
@@ -229,15 +240,15 @@ sub display_report {
 	     " (from $pricedate->{$name})",
 	     $value, $prices->{$name}); 
     } elsif ($value_prev == 0) {
-      printf("%*s  %3s %10.2f %8.2f  %10.2f %8.2f %8.2f %7s\n", 
-	     -16, substr($name,0,16), $Config{currency}, #$fx->{$name}, 
-	     $value_prev, $prev_prices->{$name},
+      printf("%*s  %3s %20s %10.2f %8.2f %8.2f %7s\n", 
+	     -16, substr($name,0,16), $Config{currency}, 
+	     "(no price available)",
 	     $value, $prices->{$name}, 
 	     $value-$value_prev, 
 	     "N/A"); 
     } else {
       printf("%*s  %3s %10.2f %8.2f  %10.2f %8.2f %8.2f %6.2f%%\n", 
-	     -16, substr($name,0,16), $Config{currency}, #$fx->{$name}, 
+	     -16, substr($name,0,16), $Config{currency}, 
 	     $value_prev, $prev_prices->{$name},
 	     $value, $prices->{$name}, 
 	     $value-$value_prev, 
@@ -372,7 +383,7 @@ non-parametric VaR estimate, requires at least 100 observations.\n";
 
 sub day_end_report {
   my $res = shift;
- 
+
   # day-end report is always relative to the previous day, we enforce previous
   # date of 24 hrs before given date by unsetting any cmdline argument that 
   # there might have been as the function will then return previous biz day
@@ -390,6 +401,67 @@ sub day_end_report {
 		 $fx_prices, $prev_fx_prices, $shares, $fx, $pricedate);
 
   $prevdatearg = $prevdatesaved; # and reset any potential cmdline arg
+}
+
+sub portfolio_retracement {
+  my ($res, $mode) = @_;
+
+  ## need to do a sanity checks on the date
+  die "Error: '$prevdatearg' note prior to '$datearg'.\n"
+    unless (Date_Cmp(ParseDate($prevdatearg), ParseDate($datearg)) < 0);
+  die "Error: '$prevdatearg' is not at least 30 days prior to '$datearg'.\n"
+    unless (Delta_Format(DateCalc(ParseDate($prevdatearg), ParseDate($datearg),
+				  undef, 2), 0, "%dt") > 30);
+
+  my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
+    = GetTodaysAndPreviousDates();
+
+  my ($fx, $prices, $tmp1, $shares, $pricedate) = 
+    GetPriceData($dbh,$date,$res);
+
+  $fx->{'home currency'} = $Config{currency};
+  my ($fx_prices)      = GetFXData($dbh, $date, $fx);
+
+  my ($highprev, $lowprev) = GetRetracementData($dbh, $date, $prev_date,
+						$res, $fx_prices);
+
+  my (%value, %totalshares);
+  foreach my $key (sort keys %$shares) {
+    my ($name,$count) = split /:/, $key;
+    $value{$name} += $shares->{$key} * $prices->{$name} 
+      * $fx_prices->{$fx->{$name}} / $fx_prices->{$Config{currency}};
+    $totalshares{$name} += $shares->{$key};
+  }
+
+  my $text = "Retracement";
+  $text = "Advances" if $mode eq "advance";
+
+  my ($tl,$fl) = build_lines(79);
+  my ($totaldown, $weightedup, $assetbase) = (0,0,0);
+  print "$tl\n" . "$text\t shares    price      value  $prev_date" .
+    " to $date  unreal. loss\n$fl\n";
+  foreach (sort keys %$prices) {
+    my ($downperc,$downamount,$refprice);
+    $refprice = $highprev->{$ARG}; # compare to recent high, or low for short
+    if (($mode eq "retrace" and $totalshares{$ARG} < 0) or   # or inverse of it
+	($mode eq "advance" and $totalshares{$ARG} > 0)) {   # if advance
+      $refprice = $lowprev->{$ARG};
+    }
+
+    $downperc = $prices->{$ARG}/$refprice - 1;
+    $downamount = $totalshares{$ARG} * ($prices->{$ARG} - $refprice)
+      * $fx_prices->{$fx->{$ARG}} / $fx_prices->{$Config{currency}};
+    printf("%-16s %6d %8.2f %10.2f  %8.2f %10.2f%%  %12.2f\n",
+	   $ARG, $totalshares{$ARG}, $prices->{$ARG}, $value{$ARG},
+	   $refprice, 100*$downperc, $downamount);
+    $totaldown += $downamount;
+    $assetbase += $value{$ARG};
+  }
+  print "$fl\n";
+  printf("Aggregate\t\t\t %10.2f \t\t%8.2f%% %13.2f\n",  
+	 $assetbase,
+	 100*$totaldown/$assetbase, $totaldown);
+  print "$tl\n";
 }
 
 sub portfolio_risk {
@@ -446,7 +518,7 @@ sub portfolio_report {
 
   ## need to do a sanity check on the date
   unless (Date_Cmp(ParseDate($prevdatearg), ParseDate($datearg)) < 0) {
-    warn "Error: Date $prevdatearg note prior to date $datearg";
+    warn "Error: Date $prevdatearg note prior to date $datearg\n";
   }
 
   my ($date, $prev_date, $pretty_date, $pretty_prev_date) 
@@ -512,7 +584,7 @@ sub add_index {
   foreach my $arg (@arg) {	# and loop over the stocks
     my $cmd = "insert into indices values ( '$arg', '$index' );";
     print "$cmd\n" if $Config{verbose};
-    $dbh->do($cmd) or warn "\nFailed with $cmd";
+    $dbh->do($cmd) or warn "\nFailed with $cmd\n";
     $dbh->commit();		# the ODBC driver needs that for a weird reason
   }
 }
@@ -551,7 +623,7 @@ sub add_portfolio {
       $sth->execute($stock, $nb, $fx, $type, $owner, $cost, $date);
       $dbh->commit();		# the ODBC driver needs that for a weird reason
     } else {
-      warn "Ignoring invalid argument $arg";
+      warn "Ignoring invalid argument $arg\n";
     }
 
     $infosth->execute($stock);
@@ -572,7 +644,7 @@ sub delete_stock {
     foreach my $table (qw/ stockinfo stockprices indices portfolio/) {
       my $cmd = "delete from $table where symbol = '$arg';";
       print "$cmd\n" if $Config{verbose};
-      $dbh->do($cmd) or warn "\nFailed with $cmd";
+      $dbh->do($cmd) or warn "\nFailed with $cmd\n";
       $dbh->commit();		# the ODBC driver needs that for a weird reason
     }
   }
@@ -616,6 +688,7 @@ beancounter [options] command [command_arguments ...]
                            see below for a complete example
  allreports		   combines dayendreport, status and risk 
  addstock arg ...          add stock(s) with symbol arg to the database
+ advanceement  		   report on unrealized gains from lows
  backpopulate  arg ...	   fill with historic data for given stock(s)
  dailyjob		   combines update, dayendreport, status + risk 
  dayendreport		   reports p/l changes relative to previous day
@@ -623,6 +696,7 @@ beancounter [options] command [command_arguments ...]
  destroydb                 delete the BeanCounter database
  plreport                  run an portfolio p/l report rel. to any day
  quote arg ...             report current data for given stock(s)
+ retracement  		   report unrealized losses from highs (drawdowns)
  risk			   display a portfolio risk report
  status			   status summary report for portfolio
  update                    update the database with day's data
@@ -842,6 +916,26 @@ the VaR of an otherwise identical portfolio with the given position
 removed.  Note that calculating marginal VaR is fairly slow (on the
 order of O(n^3) ].
 
+B<retracement> shows a 'drawdown' report. Drawdown is commonly defined
+as the percentage loss relative to the previous high. The default
+period is used, but can be altered with the B<--date> and
+B<--prevdate> options. The default period is also corrected for the
+actual holding period. In other words, if a stock has been held for
+two months, only those two months are used instead of the default of
+six months -- but if the last months has been selected via
+B<--prevdate> then it is used.  For short positions, the analysis is
+inverted and relative to the previous low. The report displays each
+stock, the number of shares held, the current price and holdings
+value. The next two columns show the maximum price attained in the
+examined period, and the percent decline relative to it. The last
+column shows the unrealized loss relative to the maximum price over
+the period. The aggregate holdings value, percent decline and
+unrealized loss are shown as well.
+
+B<advancement> does the opposite of drawdown -- it computes unrealized
+gains relative to the minimum price in the period. The discussion in
+the preceding paragraph applies `but inverted'.
+
 B<addindex> adds stocks a the index table. Currently, no further
 analysis references this table.
 
@@ -1024,7 +1118,7 @@ F<LWP.3pm>, F<Date::Manip.3pm>, F<Statistics::Descriptive.3pm>
 
 =head1 COPYRIGHT
 
-beancounter is (c) 2000, 2001 by Dirk Eddelbuettel <edd@debian.org>
+beancounter is (c) 2000, 2001, 2002 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
 F<http://eddelbuettel.com/dirk/code/beancounter.html>.

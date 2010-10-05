@@ -27,8 +27,16 @@ update:
 		$(srcdir)/update_beancounter		.
 
 webdir:
+	(cd ..; cp $(package)_$(version)_all.deb /tmp; \
+		cd /tmp; \
+		fakeroot alien -r $(package)_$(version)_all.deb; \
+		fakeroot mv $(package)-$(version)-2.noarch.rpm \
+			$(package)-$(version).noarch.rpm; \
+		cd - ; \
+		mv /tmp/$(package)-$(version).noarch.rpm . )
 	cp -af  ../$(package)_$(version).tar.gz  \
 		../$(package)_$(version)_all.deb \
+		../$(package)-$(version).noarch.rpm \
 		TODO				 \
 	        debian/changelog		 \
 		beancounter.html		 \
@@ -38,9 +46,11 @@ webdir:
 		ln -sfv	$(package)_$(version).tar.gz 	\
 			$(package)-current.tar.gz ;  	\
 		ln -sfv	$(package)_$(version)_all.deb 	\
-			$(package)-current.deb)		\
-		ln -sfv ChangeLog ChangeLog.txt		\
-		ln -sfv TODO TODO.txt
+			$(package)-current.deb	;	\
+		ln -sfv	$(package)-$(version).noarch.rpm \
+			$(package)-current.rpm	;	\
+		ln -sfv ChangeLog ChangeLog.txt	;	\
+		ln -sfv TODO TODO.txt 			)
 
 build: build-stamp
 build-stamp:
@@ -65,7 +75,6 @@ clean:
 	dh_clean
 
 binary-indep: build
-	dh_testversion ge 2.0.40
 	dh_testdir
 	dh_testroot
 	dh_clean -k

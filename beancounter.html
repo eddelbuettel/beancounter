@@ -56,6 +56,7 @@
                            see below for a complete example
  allreports                combines dayendreport, status and risk 
  addstock arg ...          add stock(s) with symbol arg to the database
+ advanceement              report on unrealized gains from lows
  backpopulate  arg ...     fill with historic data for given stock(s)
  dailyjob                  combines update, dayendreport, status + risk 
  dayendreport              reports p/l changes relative to previous day
@@ -63,6 +64,7 @@
  destroydb                 delete the BeanCounter database
  plreport                  run an portfolio p/l report rel. to any day
  quote arg ...             report current data for given stock(s)
+ retracement               report unrealized losses from highs (drawdowns)
  risk                      display a portfolio risk report
  status                    status summary report for portfolio
  update                    update the database with day's data
@@ -267,6 +269,24 @@ and calculated as the difference in the VaR of the full portfolio and
 the VaR of an otherwise identical portfolio with the given position
 removed.  Note that calculating marginal VaR is fairly slow (on the
 order of <CODE>O(n^3)</CODE> ].</P>
+<P><STRONG>retracement</STRONG> shows a 'drawdown' report. Drawdown is commonly defined
+as the percentage loss relative to the previous high. The default
+period is used, but can be altered with the <STRONG>--date</STRONG> and
+<STRONG>--prevdate</STRONG> options. The default period is also corrected for the
+actual holding period. In other words, if a stock has been held for
+two months, only those two months are used instead of the default of
+six months -- but if the last months has been selected via
+<STRONG>--prevdate</STRONG> then it is used.  For short positions, the analysis is
+inverted and relative to the previous low. The report displays each
+stock, the number of shares held, the current price and holdings
+value. The next two columns show the maximum price attained in the
+examined period, and the percent decline relative to it. The last
+column shows the unrealized loss relative to the maximum price over
+the period. The aggregate holdings value, percent decline and
+unrealized loss are shown as well.</P>
+<P><STRONG>advancement</STRONG> does the opposite of drawdown -- it computes unrealized
+gains relative to the minimum price in the period. The discussion in
+the preceding paragraph applies `but inverted'.</P>
 <P><STRONG>addindex</STRONG> adds stocks a the index table. Currently, no further
 analysis references this table.</P>
 <P><STRONG>addstock</STRONG> adds stocks to the database. From then on data will be
@@ -423,7 +443,7 @@ its predecessors have been used by the author since the end of 1998.</P>
 <P>
 <HR>
 <H1><A NAME="copyright">COPYRIGHT</A></H1>
-<P>beancounter is (c) 2000, 2001 by Dirk Eddelbuettel &lt;<A HREF="mailto:edd@debian.org">edd@debian.org</A>&gt;</P>
+<P>beancounter is (c) 2000, 2001, 2002 by Dirk Eddelbuettel &lt;<A HREF="mailto:edd@debian.org">edd@debian.org</A>&gt;</P>
 <P>Updates to this program might appear at 
 <EM><A HREF="http://eddelbuettel.com/dirk/code/beancounter.html">http://eddelbuettel.com/dirk/code/beancounter.html</A></EM>.</P>
 <P>This program is free software; you can redistribute it and/or modify

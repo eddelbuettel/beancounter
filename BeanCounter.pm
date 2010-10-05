@@ -1,7 +1,7 @@
 #
 #  BeanCounter.pm --- A stock portfolio performance monitoring toolkit
 #
-#  Copyright (C) 1998 - 2001  Dirk Eddelbuettel <edd@debian.org>
+#  Copyright (C) 1998 - 2002  Dirk Eddelbuettel <edd@debian.org>
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#  $Id: BeanCounter.pm,v 1.33 2001/10/15 01:48:44 edd Exp $
+#  $Id: BeanCounter.pm,v 1.37 2002/03/02 04:28:21 edd Exp $
 
 package Finance::BeanCounter;
 
@@ -37,8 +37,9 @@ use Text::ParseWords;		# parse .csv data more reliably
 
 @ISA = qw(Exporter);		# make these symbols known
 @EXPORT = qw(BeanCounterVersion
-	     ConnectToDb
 	     CloseDB
+	     ConnectToDb
+	     InsufficientDatabaseSchema
 	     DatabaseDailyData
 	     DatabaseHistoricalData
 	     DatabaseInfoData
@@ -51,33 +52,29 @@ use Text::ParseWords;		# parse .csv data more reliably
 	     GetDateEU
 	     GetDailyData
 	     GetFXData
-	     GetHistoricalData 
+	     GetHistoricalData
 	     GetPriceData
+	     GetRetracementData
 	     GetRiskData
-	     ParseDailyData 
-	     ParseNumeric 
+	     ParseDailyData
+	     ParseNumeric
 	     PrintHistoricalData
 	     ReportDailyData
 	     Sign
 	     UpdateDatabase
 	     UpdateFXDatabase
+	     UpdateTimestamp
 	    );
 @EXPORT_OK = qw( );
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my $VERSION = sprintf("%d.%d", q$Revision: 1.33 $ =~ /(\d+)\.(\d+)/); 
+my $VERSION = sprintf("%d.%d", q$Revision: 1.37 $ =~ /(\d+)\.(\d+)/); 
 
 my %Config;			# local copy of configuration hash
 
 sub BeanCounterVersion {
   return $VERSION;
 }
-
-sub CloseDB {
-  my $dbh = shift;
-  $dbh->disconnect;
-}
-
 
 sub ConnectToDb {		# log us into the database (PostgreSQL)
   my $dbh = undef;
@@ -101,13 +98,32 @@ sub ConnectToDb {		# log us into the database (PostgreSQL)
 			  Warn => $Config{verbose}, 
 			  AutoCommit => 0 });
   } else {
-    die "Database system $Config{dbsystem} is not supported";
+    die "Database system $Config{dbsystem} is not supported\n";
   }
-  die "No luck with database connection" unless ($dbh);
+  die "No luck with database connection\n" unless ($dbh);
 
   return $dbh;
 }
 
+sub CloseDB {
+  my $dbh = shift;
+  $dbh->disconnect;
+}
+
+sub InsufficientDatabaseSchema($$) {
+  my ($dbh, $version) = @_;
+  my @tables = $dbh->tables();
+  die "Database does not contain table beancounter. " .
+    "Please run 'update_beancounter'.\n" unless grep /beancounter/, @tables;
+  my $sql = q{select version from beancounter};
+  my @res = $dbh->selectrow_array($sql) or die $dbh->errstr;
+  my $schema = $res[0];
+  $version =~ s/\.//g;		# raw hack on the 0.1.2 => 012 version
+  $schema =~ s/\.//g;		# should be more general ...
+  print "Database has schema $schema. requiring at least $version\n" 
+    if $Config{debug};
+  return ($version < $schema);
+}
 
 sub GetTodaysAndPreviousDates {
   my ($date, $prev_date);
@@ -204,7 +220,7 @@ sub GetConfig {
     unless ($command =~ /^(update|dailyjob)$/) {
       warn "Warning: --updatedate ignored as not updating db\n";
     } else {
-      die "Error: Invalid date $updatedate for --forceupdate"
+      die "Error: Invalid date $updatedate for --forceupdate\n"
 	unless (ParseDate($updatedate));
       $Config{updatedate} =  UnixDate(ParseDate($updatedate),"%Y%m%d");
     }
@@ -383,9 +399,12 @@ sub GetPriceData {
       $cost,$pdate,%pricedate);
 
   # get the symbols
-  $stmt  = "select distinct symbol from portfolio ";
-  $stmt .= "where $res " if (defined($res));
-  $stmt .= "order by symbol";
+  $stmt  = "select distinct p.symbol from portfolio p, stockinfo s ";
+  $stmt .= "where s.symbol = p.symbol and s.active ";
+  $stmt .= qq{and p.symbol in
+	      (select distinct symbol from portfolio where $res)
+	     }   if (defined($res));
+  $stmt .= "order by p.symbol";
   @symbols = @{ $dbh->selectcol_arrayref($stmt) };
   # for each symbol, get most recent date subject to supplied date
   $stmt  = qq{select max(date) 
@@ -457,7 +476,7 @@ sub GetFXData {
     } else {
       $sth->execute($date,$fxval);	# run query for FX cross
       my ($val,$prevval) = $sth->fetchrow_array
-	or die "Could not fetch $fxval for $date";
+	or die "Could not fetch $fxval for $date\n";
       $fx_prices{$fxval} = $val;
       $prev_fx_prices{$fxval} = $prevval;
       my $ary_ref = $sth->fetchall_arrayref;
@@ -469,32 +488,103 @@ sub GetFXData {
 
 sub GetQuote {			# taken from Dj's Finance::YahooQuote
   my ($URL,@symbols) = @_;	# and modified to allow for different URL
-  my($x,@q,@qr,$ua,$url);	# and the simple filtering below as well
-  $x = $";			# the firewall code below
-  $" = "+";
-  $url = $URL."@symbols";
-  $" = $x;
-  $ua = RequestAgent->new;
-  # Load proxy settings from *_proxy environment variables.
-  $ua->env_proxy;
-  # or use the proxy specified as an option
-  $ua->proxy('http', $Config{proxy}) if $Config{proxy};
-  ## $ua->timeout($timeout);	# timeout after this many secs
-  undef @qr;
-  foreach (split('\n',$ua->request(GET $url)->content)) {
-    next if m/^\"SYMBOL\",\"PRICE\"/; # Yahoo! UK sends headers
-    next if m/index.html/;	# try csv mode at Yahoo! UK to see this bug
-    $ARG =~ s/\r$//;		# kill DOS-ish end-of-line character
-    if (tr/;// >= 2) {		# with at least 2 ';', suspect European quote
-      $ARG =~ s/,/\./g;		# so harmonize it -- . as decimal sep.
-      $ARG =~ s/;/,/g;		# and ; as field sep
+  my ($x,@q,@qr,$ua,$url);	# and the simple filtering below as well
+				# the firewall code below
+  undef @qr;			# reset result structure
+  while (scalar(@symbols) > 0) {# while we have symbols to query
+    my (@symbols_100);		# Peter Kim's patch to batch 100 at a time
+    if (scalar(@symbols)>=100) {# if more than hundred symbols left
+      @symbols_100 = splice(@symbols,0,100); # then skim the first 100 off
+    } else {			# otherwise
+      @symbols_100 = @symbols;	# take what's left
+      @symbols = ();		# and show we're done
     }
-    @q = quotewords(',', 0, $ARG);
-    push(@qr,[@q]);
-  }
-  return \@qr;
-}				
 
+    $x = $";			# this is Black Magic (TM)
+    $" = "+";			# lifted straight from DJ's YahooQuote.pm
+    $url = $URL."@symbols_100"; # concatenates all symbols with a +
+    $" = $x;			# and then resets the concat operator
+
+    $ua = RequestAgent->new;	# get a new "web agent"
+    $ua->env_proxy;		# proxy settings from *_proxy env. variables
+				# or the proxy option, if specified
+    $ua->proxy('http', $Config{proxy}) if $Config{proxy};
+    $ua->timeout($Config{timeout}) if $Config{timeout};
+
+    # now loop over the content of the current batch
+    foreach (split('\n',$ua->request(GET $url)->content)) {
+      next if m/^\"SYMBOL\",\"PRICE\"/; # skip headers from Yahoo! UK 
+      next if m/index.html/;	# try csv mode at Yahoo! UK to see this bug
+      $ARG =~ s/\r$//;		# kill DOS-ish end-of-line character
+      if (tr/;// >= 2) {	# with at least 2 ';', suspect European quote
+        $ARG =~ s/,/\./g;	# so harmonize it -- use . as decimal sep.
+        $ARG =~ s/;/,/g;	# and ; as field sep
+      }
+      @q = quotewords(',', 0, $ARG); # this parses the actual CSV records
+      push(@qr,[@q]);		# and store result as anon array
+    }
+  }
+  return \@qr;			# return a pointer to the results array
+}
+
+sub GetRetracementData {
+  my ($dbh,$date,$prevdate,$res,$fx_prices) = @_;
+
+  my (%high52, %highprev, %low52, %lowprev);
+
+  # get the symbols
+  my $stmt  = qq{select distinct p.symbol, i.name, p.shares, p.date
+		 from portfolio p, stockinfo i
+		 where p.symbol = i.symbol
+		 and i.active };
+  $stmt .= qq{and p.symbol in
+	      (select distinct symbol from portfolio where $res)
+	     }   if (defined($res));
+  $stmt .= "order by symbol";
+  my $sth = $dbh->prepare($stmt);
+  my $rv = $sth->execute(); 	# run query for report end date
+  my $sref = $sth->fetchall_arrayref;
+
+#   # get static 52max from stockinfo
+#   $stmt  = qq{select high_52weeks, low_52weeks 
+# 	      from stockinfo where symbol = ?};
+#   $sth = $dbh->prepare($stmt);
+#   foreach my $ra (@$sref) {
+#     $rv = $sth->execute($ra->[0]);
+#     my @res = $sth->fetchrow_array; 	# get data
+#     $high52{$ra->[1]} = $res[0];
+#     $low52{$ra->[1]} = $res[1];
+#   }
+
+  # get max/min over prevate .. date period
+  $stmt  = qq{select day_close 
+	      from stockprices 
+	      where symbol = ? 
+	      and date <= ? 
+	      and date >= ?
+	      and day_close > 0
+	      order by date
+	     };
+  $sth = $dbh->prepare($stmt);
+  foreach my $ra (@$sref) {
+    my $refdate = $prevdate;	# start from previous date
+    if (defined($ra->[3])) {	# if startdate in DB
+      ## then use it is later then the $prevdate
+      $refdate = $ra->[3] if (Date_Cmp($prevdate, $ra->[3]) < 0)
+    }
+    $rv = $sth->execute($ra->[0], $date, $refdate);
+    my $dref = $sth->fetchall_arrayref;	# get data
+    my $x = Statistics::Descriptive::Full->new();
+    for (my $i=0; $i<scalar(@{$dref}); $i++) { 
+      $x->add_data($dref->[$i][0]); # add prices
+    }
+    $highprev{$ra->[1]} = $x->max();
+    $lowprev{$ra->[1]} = $x->min();
+  }
+
+#  return (\%high52, \%highprev, \%low52, \%lowprev);
+  return (\%highprev, \%lowprev);
+}
 
 sub GetRiskData {
   my ($dbh,$date,$prevdate,$res,$fx_prices,$crit) = @_;
@@ -502,7 +592,8 @@ sub GetRiskData {
   # get the symbols
   my $stmt  = qq{select distinct p.symbol, i.name
 		 from portfolio p, stockinfo i
-		 where p.symbol = i.symbol };
+		 where p.symbol = i.symbol
+		 and i.active };
   $stmt .= qq{and p.symbol in
 	      (select distinct symbol from portfolio where $res)
 	     }   if (defined($res));
@@ -571,7 +662,7 @@ sub GetRiskData {
 	unless (defined($rho)) {
 	  warn "No computable correlation between $ra->[1] and $rb->[1];"
 	    . " set to 0\n";
-	  $rho = 0;
+	  $rho = 0.0;
 	}
 	$cor{$ra->[1]}{$rb->[1]} = $rho;
 	printf("%6s %6s correlation %6.4f\n", 
@@ -667,7 +758,7 @@ sub DatabaseDailyData {		# a row to the dailydata table
       next;
     }
 
-    if (ExistsDailyData($dbh, $key, %hash)) {
+    if (ExistsDailyData($dbh, %{$hash{$key}})) {
       $cmd = "update stockprices set" .
  	     "  previous_close = $hash{$key}{previous_close}," .
 	     "  day_open       = $hash{$key}{day_open}," .
@@ -709,7 +800,7 @@ sub DatabaseFXDailyData {
   foreach my $key (keys %hash) { # now split these into reference to the arrays
     my $fx = $yahoo2iso->{$hash{$key}{symbol}};
     print "$fx ($hash{$key}{symbol})  " if $Config{debug};
-    if (ExistsFXDailyData($dbh, $fx, $key, %hash)) {
+    if (ExistsFXDailyData($dbh, $fx, %{$hash{$key}})) {
       # different sequence of parameters, see SQL statement above!
       my $stmt = qq{update fxprices
                     set previous_close = ?,
@@ -749,36 +840,69 @@ sub DatabaseFXDailyData {
   }
 }
 
-
 sub DatabaseHistoricalData {
   my ($dbh, $symbol, @res) = @_;
-  my $checked = 0;
-  foreach $ARG (@res) {
-    # we better make sure that the first line of data is correct 
-    # so that we don't insert garbage
+  my $checked = 0;		# flag to make sure is not nonsensical or errors
+  my %data;			# hash to store data of various completenesses
+  foreach $ARG (@res) {		# loop over all supplied symbols
+    # make sure the first line of data is correct so we don't insert garbage
     if ($checked==0 and m/Date(,Open,High,Low)?,Close(,Volume)?/) {
       $checked = tr/,//;
       print "Checked now $checked\n" if $Config{verbose};
     } elsif ($checked) {
       my ($date, $open, $high, $low, $close, $volume, $cmd);
+      # based on the number of elements, ie columns, we split the parsing
       if ($checked eq 5) {	# indices have no volume
 	($date, $open, $high, $low, $close, $volume) = split(/\,/, $ARG);
 	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
-	$cmd = "insert into stockprices " . 
-         "(symbol, date, day_open, day_high, day_low, day_close, volume) " .
-	 "values ('$symbol', '$date', $open, $high, $low, $close, $volume);";
+	%data = (symbol    => $symbol,
+		 date	   => $date,
+		 day_open  => $open,
+		 day_high  => $high,
+		 day_low   => $low,
+		 day_close => $close,
+		 volume    => $volume);
       } elsif ($checked eq 1) {	# only close for mutual funds
 	($date, $close) = split(/\,/, $ARG);
 	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
-	$cmd = "insert into stockprices " . 
-	  "(symbol, date, day_open, day_high, day_low, day_close, volume) " .
-	    "values ('$symbol', '$date', null, null, null, $close, null);";
+	%data = (symbol    => $symbol,
+		 date	   => $date,
+		 day_close => $close);
       } else {			# no volume for indices
 	($date, $open, $high, $low, $close) = split(/\,/, $ARG);
 	$date = UnixDate(ParseDate($date), "%Y-%m-%d");
-	$cmd = "insert into stockprices " . 
-	  "(symbol, date, day_open, day_high, day_low, day_close, volume) " .
-	    "values ('$symbol', '$date', $open, $high, $low, $close, null);";
+	%data = (symbol    => $symbol,
+		 date	   => $date,
+		 day_open  => $open,
+		 day_high  => $high,
+		 day_low   => $low,
+		 day_close => $close);
+      }
+
+      # now given the data, decide whether we add new data or update old data
+      if (ExistsDailyData($dbh,%data)) { # update data if it exists
+	$cmd = "update stockprices set ";
+	$cmd .= "volume    = $data{volume},"    if defined($data{volume});
+	$cmd .= "day_open  = $data{day_open},"  if defined($data{day_open});
+	$cmd .= "day_low   = $data{day_low},"   if defined($data{day_low});
+	$cmd .= "day_high  = $data{day_high},"  if defined($data{day_high});
+	$cmd .= "day_close = $data{day_close} "   .
+	        "where symbol = '$data{symbol}' " .
+		"and date     = '$data{date}'";
+      } else {			# insert
+	$cmd = "insert into stockprices (symbol, date,";
+	$cmd .= "day_open," if defined($data{day_open});
+	$cmd .= "day_high," if defined($data{day_high});
+	$cmd .= "day_low,"  if defined($data{day_low});
+	$cmd .= "day_close";
+	$cmd .= ",volume"  if defined($data{volume});
+	$cmd .= ") values ('$symbol', '$date', ";
+	$cmd .= "$data{day_open},"   if defined($data{day_open});
+	$cmd .= "$data{day_high},"   if defined($data{day_high});
+	$cmd .= "$data{day_low},"    if defined($data{day_low});
+	$cmd .= "$data{day_close}"; 
+	$cmd .= ",$data{volume} "    if defined($data{volume});
+        $cmd .= ");";
       }
       print "$cmd\n" if $Config{debug};
       $dbh->do($cmd) or die $dbh->errstr;
@@ -786,7 +910,6 @@ sub DatabaseHistoricalData {
     } else {
       ;				# do nothing with bad data
     }
-
   }
   print "Done with $symbol\n" if $Config{verbose};
 }
@@ -795,17 +918,19 @@ sub DatabaseHistoricalData {
 sub DatabaseInfoData {		# update a row in the info table
   my ($dbh, %hash) = @_;
   foreach my $key (keys %hash) { # now split these into reference to the arrays
-    my $cmd = "insert into stockinfo values (" . 
-              "'$hash{$key}{symbol}'," .
-	      $dbh->quote($hash{$key}{name}) . ", " .
-	      "'$hash{$key}{exchange}', " .
-              "$hash{$key}{market_capitalisation}," .
-              "$hash{$key}{'52_week_low'}," .
-  	      "$hash{$key}{'52_week_high'}," .
-	      "$hash{$key}{earnings_per_share}," .
-	      "$hash{$key}{dividend_per_share}," .
-	      "$hash{$key}{price_earnings_ratio}," .
-	      "$hash{$key}{average_volume})";
+    my $cmd = "insert into stockinfo (symbol, name, exchange, " .
+	      "  capitalisation, low_52weeks, high_52weeks, earnings, " .
+	      "  dividend, p_e_ratio, avg_volume) " .
+	      "values('$hash{$key}{symbol}'," .
+	         $dbh->quote($hash{$key}{name}) . ", " .
+	      "  '$hash{$key}{exchange}', " .
+              "  $hash{$key}{market_capitalisation}," .
+              "  $hash{$key}{'52_week_low'}," .
+  	      "  $hash{$key}{'52_week_high'}," .
+	      "  $hash{$key}{earnings_per_share}," .
+	      "  $hash{$key}{dividend_per_share}," .
+	      "  $hash{$key}{price_earnings_ratio}," .
+	      "  $hash{$key}{average_volume})";
     $cmd =~ s|'?N/A'?|null|g;	# convert (textual) "N/A" into (database) null 
     print "$cmd\n" if $Config{debug};
     print "$hash{$key}{symbol} " if $Config{verbose};
@@ -816,15 +941,14 @@ sub DatabaseInfoData {		# update a row in the info table
 
 
 sub ExistsDailyData {
-  my ($dbh,$key,%hash) = @_;
+  my ($dbh, %hash) = @_;
   my $stmt = qq{select previous_close, day_open, day_low, day_high,
 		       day_close, day_change, bid, ask, volume
 		from stockprices
 		where symbol = ?
 		and date     = ?
 	       };
-  if (@row = $dbh->selectrow_array($stmt, undef, $hash{$key}{symbol},
-				   $hash{$key}{date})) {
+  if (@row = $dbh->selectrow_array($stmt, undef, $hash{symbol}, $hash{date})) {
     # plausibility tests here
     return 1;
   } else {
@@ -832,9 +956,8 @@ sub ExistsDailyData {
   }
 }
 
-
 sub ExistsFXDailyData {
-  my ($dbh,$fx,$key,%hash) = @_;
+  my ($dbh,$fx,%hash) = @_;
   my $stmt = qq{select previous_close, day_open, day_low, day_high,
                        day_close, day_change
                 from fxprices
@@ -842,7 +965,7 @@ sub ExistsFXDailyData {
                   and date     = ?
               };
   my $sth = $dbh->prepare($stmt);
-  $sth->execute($fx,$hash{$key}{date});
+  $sth->execute($fx,$hash{date});
   if (@row = $sth->fetchrow_array()) {
     # plausibility tests here
     return 1;
@@ -1102,7 +1225,8 @@ sub UpdateDatabase {		# update content in the db at end of day
 
   $stmt = qq{  select distinct symbol
 	       from stockinfo
-	       where symbol != '' };
+	       where symbol != '' 
+	       and active };
   $stmt .= qq{   and symbol in (select distinct symbol 
 			        from portfolio where $res)
 	     } if defined($res);
@@ -1118,6 +1242,7 @@ sub UpdateDatabase {		# update content in the db at end of day
   ReportDailyData(%data) if $Config{verbose};
   UpdateInfoData($dbh, %data);
   DatabaseDailyData($dbh, %data);
+  UpdateTimestamp($dbh);
 }
 
 
@@ -1146,6 +1271,7 @@ sub UpdateFXDatabase {
     ReportDailyData(%data) if $Config{verbose};
     DatabaseFXDailyData($dbh, %data);
   }
+  UpdateTimestamp($dbh);
 }
 
 
@@ -1168,6 +1294,13 @@ sub UpdateInfoData {		# update a row in the info table
   }
 }
 
+sub UpdateTimestamp {
+  my $dbh = shift;
+  my $cmd = q{update beancounter set data_last_updated='now'};
+  print "$cmd\n" if $Config{debug};
+  $dbh->do($cmd) or warn "UpdateTimestamp failed\n";
+  $dbh->commit();
+}
 
 BEGIN {				# Local variant of LWP::UserAgent that 
   use LWP;			# checks for user/password if document 
@@ -1336,7 +1469,7 @@ F<LWP.3pm>, F<Date::Manip.3pm>
 
 =head1 COPYRIGHT
 
-Finance::BeanCounter.pm is (c) 2000, 2001 by Dirk Eddelbuettel <edd@debian.org>
+Finance::BeanCounter.pm  (c) 2000 -- 2002 by Dirk Eddelbuettel <edd@debian.org>
 
 Updates to this program might appear at 
 F<http://eddelbuettel.com/dirk/code/beancounter.html>.

@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: setup_beancounter,v 1.14 2001/10/10 02:22:16 edd Exp $
+#   $Id: setup_beancounter,v 1.16 2002/02/12 05:28:21 edd Exp $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -85,6 +85,11 @@ function create_mysql_tables()
 {
     echo | $DBCOMMAND $DATABASE <<EOF 
 
+    create table beancounter (
+	version			varchar(12) not null,
+   	data_last_updated	datetime
+    );
+
     CREATE TABLE fxprices (
 	currency varchar(12) NOT NULL default '',
 	date date default NULL,
@@ -124,6 +129,7 @@ function create_mysql_tables()
 	dividend float default NULL,
 	p_e_ratio float default NULL,
 	avg_volume int(11) default NULL,
+	active bool default 1,
 	PRIMARY KEY (symbol)
     ) TYPE=MyISAM;
 
@@ -160,6 +166,11 @@ function create_postgres_tables()
 {
     echo | $DBCOMMAND $DATABASE <<EOF 
 
+	create table beancounter (
+	    version		varchar(12) not null,
+   	    data_last_updated	datetime
+	);
+
 	create table stockinfo (
 	    symbol   		varchar(12) not null default '',
 	    name     		varchar(64) not null default '',
@@ -170,7 +181,8 @@ function create_postgres_tables()
 	    earnings		float4 default null,
 	    dividend		float4 default null,
 	    p_e_ratio		float4 default null,
-	    avg_volume		int4 default null
+	    avg_volume		int4 default null,
+	    active		boolean default TRUE
 	);
 	create unique index stockinfo_pkey
 	    on stockinfo (symbol);
@@ -351,7 +363,6 @@ do
 	n)
 	    DATABASE=$OPTARG
 	    echo "Now using database name $DATABASE"
-	    exit 1
 	    ;;
 	s)
 	    SCHEMA_ONLY=1

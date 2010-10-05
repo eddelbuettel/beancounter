@@ -61,3 +61,8 @@ As of February 2001, I have yet to test it on a current Debian 'unstable'
 release (with release-number-to-be 2.3 and codename 'woody'). There might be
 issues with Postgresql 7.* that I am not yet aware of. If the reader of these
 lines finds any, I would appreciate an email, preferably with some examples.
+
+Update: There were some subtle changes from Postgresql 6.5.* to 7.* but it
+works jus fine. 
+
+Update^2: We now also work with MySQL.

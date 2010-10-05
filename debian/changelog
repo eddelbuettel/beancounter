@@ -1,3 +1,60 @@
+beancounter (0.5.0) unstable; urgency=low
+
+  * New release with the following new features:
+
+    - New command 'retracement' to calculate drawdowns for the given data
+      period -- these are defined as price decreases relative to the
+      maximum price in the period. This can be seen as hypothetical
+      unrealized losses relative to the would-coulda-shouda optimal selling
+      price. Shorts are treated the other way relative to their lows.
+   
+    - New command 'advancement' which does the same for gains relative to lows.
+  
+    - Applied patch by Peter Kim <pykim@gte.net> so that 'update' now
+      batches queries in round lots of one hundred symbols.
+   
+    - The backpopulate command is now idempotent too: it can now be run 
+      even if data already exists and will use either 'insert' or 'update'
+      as required.
+  
+    - The stockinfo table has a new column 'active' allowing to flag 
+      inactive stocks (or e.g. expired options) with a 'false' value.
+  
+    - The database has a new table 'beancounter' with fields for the
+      current version (to ensure code and database schema match) and
+      the most recent update.
+  
+  * Detailed changes
+
+    - BeanCounter.pm: Applied Peter's patch, pluse comments / indents
+
+    - BeanCounter.pm: New function GetRetracementData
+
+    - BeanCounter.pm: New function UpdateTimestamp
+
+    - beancounter: New function portfolio_retracement
+  
+    - BeanCounter.pm: Rewrote DatabaseHistoricalData for idempotency
+ 
+    - beancounter: Example now uses full example with purchase date / time
+  
+    - BeanCounter.pm: Rewrote SQL restriction for getting price data
+  
+    - Database scheme: New field 'active' to flag inactive stocks / options
+  
+    - BeanCounter.pm: Make use of 'active' field when retrieving data
+  
+    - BeanCounter.pm: Simpliefied API for ExistsDailyData()
+  
+    - setup_beancounter: Added creation of active field in stockinfo
+  
+    - update_beancounter: Idem
+  
+  * debian/control: Spelling correction (Closes: #124442)
+  * debian/control: Upgraded to Standards-Version 3.5.0
+ 
+ -- Dirk Eddelbuettel <edd@debian.org>  Tue,  5 Mar 2002 22:06:51 -0600
+
 beancounter (0.4.0) unstable; urgency=low
 
   * New release with the following new features

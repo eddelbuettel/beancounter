@@ -13,6 +13,8 @@ Mathias Weidner <mathias@weidner.in-bad-schmiedeberg.de>
         and the patch to allow 'update' to either insert or update
 Max Bott <Max.Bott@affa.gov.au> 
 	for the bug report on quotes in company name's (DatabaseInfoData)      
+Peter Kim <pykim@gte.net>
+        for the update-in-batches-of-100 patch 
 
 and all the kind folks who dropped a line to either report a bug, and/or 
 say that they liked the program... 

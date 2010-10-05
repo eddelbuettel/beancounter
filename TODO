@@ -1,5 +1,6 @@
 
 * stock splits
+  [ idempotent backpopulation, which is done in 0.5.0, eases this a little ] 
 
 * annualised returns
   [was done in status command, currently turned off; probably needs another
@@ -29,13 +30,15 @@
   [ cf below on idempotent operations, should no longer be an issue ]
 
 * fx quotes are currently retrieved via Yahoo from the Philadelphia exchange
-  -- but that means no quotes are available on US holidays. We also have no
-  access to historical FX data.
+  -- but that means no quotes are available on US holidays. 
+
+* We also have no access to historical FX data for backpopulation
 
 * there is also a plain error somewhere as eg a DEM based portfolio sees a
   return even though a EUR traded stock didn't move -- can't really happen
   as DEM/EUR rates are fixed. Maybe add an crosscurrency table/hash and do
   no ask Yahoo! if cross-rate known 
+  [ not an issue if portfolio is reported in EUR ]
 
 * Yahoo seems to return bad date information every now and then. A
   "scrubbing" between retrieval and databasing might help: we can check if
@@ -61,7 +64,7 @@
   and maybe a date
 
 * update_beancounter needs to reflect the post-0.3.1 table changes
-  [ dones, tested against 0.1.1, 0.3.0 and 0.3.1 (with PostgreSQL) ]
+  [ done, tested against 0.1.1, 0.3.0 and 0.3.1 (with PostgreSQL) ]
 
 * beancounter regression test data set, data "feeding" program and test 
   routines
@@ -85,6 +88,14 @@
 * (really distant wishlist feature) build portfolio up from stock trades, 
   have analysis driven from transactions
 
-* new columns "soldprice","soldate" to compute returns on completed transactions
+* new columns "soldprice","solddate" to compute returns on completed 
+  transactions
  
-* suppress noisy error messages when we have not enough data for the risk report
+* suppress noisy error messages when we have not enough data for the risk 
+  report
+
+* added 'active' boolean field to stockinfo
+  [ done in 0.5.0 ]
+
+* restrictions don't aggregate right if they only "partly" hit a holding
+  (eg holding a stock in two accounts, blocking one --> still get total)

@@ -2,7 +2,7 @@
 #
 #   update_beancounter --- Modify beancounter database
 #  
-#   Copyright (C) 2000, 2001  Dirk Eddelbuettel <edd@debian.org>
+#   Copyright (C) 2000 - 2002  Dirk Eddelbuettel <edd@debian.org>
 #  
 #   This program is free software; you can redistribute it and/or modify
 #   it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #   along with this program; if not, write to the Free Software
 #   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-#   $Id: update_beancounter,v 1.4 2001/10/04 03:18:20 edd Exp $
+#   $Id: update_beancounter,v 1.6 2002/02/12 05:39:20 edd Exp edd $
 
 # If we really want to be independent of the underlying database, this 
 # probably needs to written in Perl using DBI/DBD
@@ -32,6 +32,7 @@ then
     USER=$(whoami)
 fi
 
+VERSION=0.5.0
 #DATABASE='testbean'
 DATABASE='beancounter'
 #PASSWORD=
@@ -51,6 +52,74 @@ EOF
     exit 0
 }
 
+# add 'active' column to stockinfo
+function add_beancounter_table_if_needed()
+{
+    rc=0
+    table=beancounter
+
+    set +e
+    if [ "$DBSYSTEM" = "MySQL" ]; then
+	query="show tables"
+    else
+	query="\d"
+    fi
+
+    echo $query | $DBCOMMAND | grep -q $table
+    rc=$?
+
+    if [ "$rc" -ne 0 ]; then
+	cmd="create table $table (version varchar(12) not null, data_last_updated datetime)"
+	echo "Running $cmd"
+	echo $cmd | $DBCOMMAND
+
+	cmd="insert into beancounter values('$VERSION','now')"
+	echo "Running $cmd"
+	echo $cmd | $DBCOMMAND
+    fi
+    set -e
+
+    return 0
+}
+
+# add 'active' column to stockinfo
+function add_active_if_needed()
+{
+    rc=0
+    table=stockinfo
+    column=active
+
+    set +e
+    if [ "$DBSYSTEM" = "MySQL" ]; then
+	query="show columns from $table"
+    else
+	query="\d $table"
+    fi
+
+    echo $query | $DBCOMMAND | grep -q $column
+    rc=$?
+
+    if [ "$rc" -ne 0 ]; then
+	if [ "$DBSYSTEM" = "MySQL" ]; then
+	    cmd="alter table $table add column active bool default 1"
+	    echo $cmd | $DBCOMMAND
+	    echo "Running $cmd"
+	else
+	    cmd="alter table $table add column active boolean"
+	    echo $cmd | $DBCOMMAND
+	    echo "Running $cmd"
+	    cmd="alter table $table alter column active set default true"
+	    echo $cmd | $DBCOMMAND
+	    echo "Running $cmd"
+	    cmd="update table $table set active = true where active is null"
+	    echo $cmd | $DBCOMMAND
+	    echo "Running $cmd"
+	fi
+    fi
+    set -e
+
+    return 0
+}
 
 # test if given column (argument 1) exists in a given table (argument 2)
 # and add it with given specs (argument 3) if it does not already exist
@@ -95,11 +164,11 @@ function reindex_portfolio_table
 
 # test if given column (argument 1) exists in a given table (argument 2)
 # and if so rename it to new name (argument 3) and spec (arg 4; mysql only)
-function rename_if_exists_column()
+function rename_if_not_exists_column()
 {
-    column=$1
+    oldname=$1
     table=$2
-    newname=$3
+    column=$3
     spec=$4
     rc=0
 
@@ -109,18 +178,19 @@ function rename_if_exists_column()
     else
 	query="\d $table"
     fi
-    ##echo "Query $query -> $DBCOMMAND"
-    echo $query | $DBCOMMAND | grep -q $column
+
+    echo $query | $DBCOMMAND | grep -q "$column"
     rc=$?
 
-    if [ "$rc" -eq 0 ]; then
+    if [ "$rc" -ne 0 ]; then
 	if [ "$DBSYSTEM" = "MySQL" ]; then
-	    cmd="alter table $table change $column $newname $spec;"
+	    # nothing to do as we only added this for 0.4.0
+	    true
 	else    
-	    cmd="alter table $table rename $column to $newname;"
+	    cmd="alter table $table rename $oldname to $column;"
+	    echo $cmd | $DBCOMMAND
+	    echo "Running $cmd"
 	fi    
-	echo $cmd | $DBCOMMAND
-	## echo "Running $cmd"
     fi
     set -e
 
@@ -132,12 +202,11 @@ do
     case $opt in
 	m)
 	    DBSYSTEM='MySQL'
-	    echo "Now using $DBSYSTEM"
+	    #echo "Now using $DBSYSTEM"
 	    ;;
 	n)
 	    DATABASE=$OPTARG
-	    echo "Now using database name $DATABASE"
-	    exit 1
+	    #echo "Now using database name $DATABASE"
 	    ;;
 	h)
 	    usage_and_exit
@@ -147,6 +216,7 @@ do
 	    ;;
     esac
 done	    
+echo "Examining database $DATABASE on $DBSYSTEM"
 
 if [ "$DBSYSTEM" = "MySQL" ]
 then
@@ -173,9 +243,13 @@ add_unless_exists_column date  portfolio "date  default null"
 
 reindex_portfolio_table
 
-rename_if_exists_column change stockprices day_change "float default null"
-rename_if_exists_column change fxprices day_change "float default null"
-rename_if_exists_column index indices stockindex 'varchar(12) not null default ""'
+rename_if_not_exists_column change stockprices day_change "float default null"
+rename_if_not_exists_column change fxprices day_change "float default null"
+rename_if_not_exists_column index indices stockindex 'varchar(12) not null default ""'
+
+add_active_if_needed
+
+add_beancounter_table_if_needed
 
 echo "Done."
 exit 0
