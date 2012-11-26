@@ -68,7 +68,7 @@ fi
 
 # Dow Jones Industrial Average 
 # see for example http://www.amex.com/indexshares/index_shares_diamonds_list.stm
-DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG T UTX WMT"
+DJIA="AA AXP T BA CAT C KO DIS DD XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG T UTX WMT"
 
 # S&P500 is at http://www.spglobal.com/ssindexmain500text.html
 # NASDAQ is at http://www.nasdaq.com/asp/nasdaq100_activity.stm
