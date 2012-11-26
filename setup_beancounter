@@ -604,7 +604,7 @@ echo "Filling $DATABASE with historical fx prices for EUR and CAD"
 execute "$BEANCOUNTER fxbackpopulate --ubcfx --prevdate '1 year ago' --date '$LASTBIZDAY' EUR CAD"
 
 echo "Running portfolio pl report on (sample) portfolio"
-execute "$BEANCOUNTER plreport --date '$LASTBIZDAY'"
+execute "$BEANCOUNTER plreport --currency USD --date '$LASTBIZDAY'"
 
 # dayendreport needs a db entry previous price which we don't get from 
 # all backpop routines / data combinations
@@ -612,7 +612,7 @@ execute "$BEANCOUNTER plreport --date '$LASTBIZDAY'"
 #execute "$BEANCOUNTER dayendreport --date '$LASTBIZDAY'"
 
 echo "Running portfolio riskreport on (sample) portfolio"
-execute "$BEANCOUNTER risk --date '$LASTBIZDAY'"
+execute "$BEANCOUNTER risk --currency USD --date '$LASTBIZDAY'"
 
 echo "Done."
 exit 0
