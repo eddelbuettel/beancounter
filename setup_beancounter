@@ -121,12 +121,12 @@ function create_mysql_tables
 	day_close float default NULL,
 	day_change float default NULL,
 	UNIQUE KEY fxprices_pkey(currency,date)
-    ) TYPE=MyISAM;
+    ) ENGINE='MyISAM';
 
     CREATE TABLE indices (
 	symbol varchar(12) NOT NULL default '',
 	stockindex varchar(12) NOT NULL default ''
-    ) TYPE=MyISAM;
+    ) ENGINE=MyISAM;
 
     CREATE TABLE portfolio (
 	symbol varchar(16) NOT NULL default '',
@@ -137,7 +137,7 @@ function create_mysql_tables
 	cost float default NULL,
 	date date default NULL,
 	UNIQUE KEY portfolio_pkey(symbol,owner,date)
-    ) TYPE=MyISAM;
+    ) ENGINE=MyISAM;
 
     CREATE TABLE stockinfo (
 	symbol varchar(12) NOT NULL default '',
@@ -152,7 +152,7 @@ function create_mysql_tables
 	avg_volume int(11) default NULL,
 	active bool default '1',
 	PRIMARY KEY (symbol)
-    ) TYPE=MyISAM;
+    ) ENGINE=MyISAM;
 
     CREATE TABLE stockprices (
 	symbol varchar(12) NOT NULL default '',
@@ -167,7 +167,7 @@ function create_mysql_tables
 	ask float default NULL,
 	volume numeric default NULL,
 	UNIQUE KEY stockprices_pkey(symbol,date)
-    ) TYPE=MyISAM;
+    ) ENGINE=MyISAM;
 
     create table cash (
 	name varchar(16) not null default '',
@@ -178,7 +178,7 @@ function create_mysql_tables
 	cost float default NULL,
 	date date default NULL,
 	UNIQUE KEY cash_pkey(name,type,owner,date)
-    ) TYPE=MyISAM;
+    ) ENGINE=MyISAM;
     \q
 EOF
 }
