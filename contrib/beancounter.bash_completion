@@ -1,0 +1,30 @@
+# elementary bash-completion for beancounter
+# copy this file to /etc/bash_completion.d/beancounter
+# 2012-11-19, nicola.chiapolini@physik.uzh.ch 
+
+_beancounter()
+{
+    local cur prev comm opts 
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    comm="addindex addportfolio allreports addstock advancement"
+    comm="$comm backpopulate checkdbconnection dailyjob dayendreport"
+    comm="$comm deactivate delete destroydb fxbackpopulate lsportfolio"
+    comm="$comm plreport quote retracement risk split status update"
+    comm="$comm warranty lspositions"
+    opts="--help --verbose --date --prevdate --currency --restriction"
+    opts="$opts --extrafx --forceupdate --rcfile --fxupdate --commit"
+    opts="$opts --equityupdate --ubcfx --nofxupdate --nocommit"
+    opts="$opts --noequityupdate --noubcfx --splitby --dbsystem --dbname"
+
+    if [[ ${cur} == -* ]] ; then
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+    else
+        COMPREPLY=( $(compgen -W "${comm}" -- ${cur}) )
+        return 0
+    fi
+}
+complete -F _beancounter beancounter
+
