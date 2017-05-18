@@ -399,9 +399,12 @@ sub display_longstatus {
   foreach my $key (sort keys %value) {
     my ($name,$count) = split /:/, $key;
     my $value = $value{$key};
-    my ($daysheld,$return,$fxthen,$fxnow) = ("", "", 1.0, 1.0);
+# daysheld default can be a zero, to amake perl >= 5.12 happier
+    my ($daysheld,$return,$fxthen,$fxnow) = (0, "", 1.0, 1.0);
     if (defined($pdate->{$key})) { # if we have a purchase date
       $daysheld = Delta_Format(DateCalc($pdate->{$key}, $date, \$err, 2), "approx", 0, "%dt");
+#	comfort perl >= 5.12
+      if (! defined $daysheld ) {$daysheld = 0 ; }
       if (defined($cost->{$key}) and $daysheld >= 0 and $cost->{$key} != 0) {
 	if ($fx->{$name} ne $Config{currency}) {
 	  $fxthen = GetFXDatum($dbh, $pdate->{$key}, $fx->{$name});
@@ -410,6 +413,7 @@ sub display_longstatus {
  	$return = (($prices->{$name} * $fxnow) / ($cost->{$key} * $fxthen) - 1)
 	  * 100 * Sign($shares->{$key});
  	# annualise if held longer than > 1 year
+#	perl >= 5.12 alread comforted as to $daysheld
 	$return *= 365 / $daysheld if ($daysheld > 365);
 	# weigh returns by the invested amount, not the current value
 	# NB this omits possible changes in the FX rate
@@ -418,6 +422,8 @@ sub display_longstatus {
 	$assetbase += $invested;
       }
     }
+#	comfort perl >= 5.12, was previously fixed out of this scope
+    if (! defined $daysheld ) {$daysheld = 0 ; }
     printf("%*s %6d   %3s %8.2f   %3s %10.2f  %s %s\n", 
 	   -18, substr($name,0,17), 
 	   $shares->{$key},  
