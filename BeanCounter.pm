@@ -1614,7 +1614,15 @@ sub ParseDailyData {		# stuff the output into the hash
 
 
 sub ParseNumeric {		# parse numeric fields which could be fractions
-  my $v = shift;		# expect one argument
+# 
+#	try to quell: 
+#	Use of uninitialized value $v in substitution (s///) 
+#	at /usr/share/perl5/vendor_perl/Finance/BeanCounter.pm line 1618
+#
+      my $v = 0 ;
+  $v = shift;		# expect one argument
+  # comfort perl >= 5.12 and later
+  if (! defined $v) { $v = 0 ;} 
   $v =~ s/\s*$//;		# kill trailing whitespace
   $v =~ s/\+//;			# kill leading plus sign
   if ($v =~ m|(.*) (.*)/(.*)|) {# if it is a fraction
@@ -1738,8 +1746,16 @@ sub ScrubDailyData {          # stuff the output into the hash
 
     if ($hash{$key}{date} ne $Config{today}) {   # if date is not today
 
-      my $age = Delta_Format(DateCalc($hash{$key}{date}, $Config{lastbizday},
+#	try to quell undef noise:
+#		Use of uninitialized value $age in numeric gt (>) \
+#			at /usr/share/perl5/vendor_perl/Finance/BeanCounter.pm line 1743
+      my $age = 6 ;
+      #Delta_Format($Config{today}, $Config{lastbizday},
+      #                              undef, 2), "approx", 0, "%dt");
+      $age = Delta_Format(DateCalc($hash{$key}{date}, $Config{lastbizday},
 				      undef, 2), "approx", 0, "%dt");
+# comfort perl >= 5.12 and later
+      if (! defined $age ) { $age = 6 ; }
       if ($age > 5) {
         warn "Ignoring $hash{$key}{symbol} ($hash{$key}{name}) " .
 	  "with old date $hash{$key}{date}\n";
