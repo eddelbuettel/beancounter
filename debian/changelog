@@ -1,3 +1,19 @@
+beancounter (0.8.11.1) unstable; urgency=medium
+
+  * debian/control: Remove libdbd-sqlite2-perl as choice from optional
+    Depends: as sqlite3 has long been the default 	(Closes: #1011476)
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Wed, 25 May 2022 11:56:18 -0500
+
+beancounter (0.8.11) unstable; urgency=medium
+
+  * debian/rules update adding two targets 		(Closes: #999231)
+  * debian/control: Set Standards-Version: to current version 
+  * debian/control: Switch to debhelper-compat
+  * debian/compat: Removed
+
+ -- Dirk Eddelbuettel <edd@debian.org>  Wed, 10 Nov 2021 08:55:15 -0600
+
 beancounter (0.8.10) unstable; urgency=low
 
   * Minor bugfix releases:

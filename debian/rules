@@ -98,6 +98,9 @@ build-stamp:
 	$(MAKE) test
 	touch build-stamp
 
+build-arch: build-stamp
+build-indep: build-stamp
+
 clean:
 	dh_testdir
 	dh_testroot
@@ -109,7 +112,8 @@ clean:
 binary-indep: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	#dh_clean -k
+	dh_prep
         #dh_installdirs		usr/bin usr/share/man/man1
         #dh_installdirs		usr/bin 
         #$(MAKE) 		prefix=$(debtmp)/usr pure_install

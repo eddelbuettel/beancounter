@@ -411,10 +411,10 @@ sub GetOandAFXData {
 
   my $base = $Config{currency};	# instead of unconditionally requesting USD
 
-  ## OandA needs the dates as yy, mm and dd
+  ## we need the dates as yyyy, mm and dd
   my ($fy,$fm,$fd,$ty,$tm,$td);	
-  ($skip,$fy,$fm,$fd) = ($from =~ m/(\d\d)(\d\d)(\d\d)(\d\d)/);
-  ($skip,$ty,$tm,$td) = ($to =~ m/(\d\d)(\d\d)(\d\d)(\d\d)/);
+  ($fy,$fm,$fd) = ($from =~ m/(\d\d\d\d)(\d\d)(\d\d)/);
+  ($ty,$tm,$td) = ($to =~ m/(\d\d\d\d)(\d\d)(\d\d)/);
 
   ## build the query URL
   my $url = "http://www.oanda.com/convert/fxhistory?lang=en&";

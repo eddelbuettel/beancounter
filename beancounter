@@ -605,7 +605,7 @@ sub lsportfolio {
   } elsif ($datearg ne "today") {
     $stmt = $stmt . qq{where date='$datearg' };
   } else {			# need a default clause
-    $stmt = $stmt . qq{where date > '19700101' };
+    $stmt = $stmt . qq{where date > '1970-01-01' };
   }
   $stmt = $stmt . 
     qq{and symbol in (select symbol from stockinfo where active) } .
@@ -617,17 +617,19 @@ sub lsportfolio {
 
   # perform the access
   my $sth = $dbh->prepare($stmt);
-  $sth->execute() or die("Failed to retrive portfolio info");
-  # print the results
-  print "$tl\n\t\t\tPortfolio listing\n$fl\n";
-  printf "%-10.10s%8.8s%8.8s%12.12s%12.12s%12.12s%17.17s\n$fl\n",
-      "Symbol", "Shares", "FX", "  Type", "  Owner", "    Cost", "    Date";
-  while (my @row_ary = $sth->fetchrow_array) {
-    my ($stock, $nb, $fx, $type, $owner, $cost, $date) = @row_ary;
-    printf "%-10.10s%8d%8s%12s%12s%12.2f%17s\n",
-     $stock, $nb, $fx, $type, $owner, $cost, $date;
+  my $rows = $sth->execute;
+  if ( defined($rows) and $rows > 0 ) {
+    # print the results
+    print "$tl\n\t\t\tPortfolio listing\n$fl\n";
+    printf "%-10.10s%8.8s%8.8s%12.12s%12.12s%12.12s%17.17s\n$fl\n",
+        "Symbol", "Shares", "FX", "  Type", "  Owner", "    Cost", "    Date";
+    while (my @row_ary = $sth->fetchrow_array) {
+      my ($stock, $nb, $fx, $type, $owner, $cost, $date) = @row_ary;
+      printf "%-10.10s%8d%8s%12s%12s%12.2f%17s\n",
+       $stock, $nb, $fx, $type, $owner, $cost, $date;
+    }
+    print "$tl\n";
   }
-  print "$tl\n";
   $sth->finish;
 }
 
@@ -650,7 +652,7 @@ sub lspositions {
   if ($sqlrestriction) {
     $stmt = $stmt . qq{where $sqlrestriction };
   } else {			# need a default clause
-    $stmt = $stmt . qq{where p.date > '19700101' };
+    $stmt = $stmt . qq{where p.date > '1970-01-01' };
   }
   if ($fxarg) {
     $stmt = $stmt . qq{and p.currency='$fxarg' };
@@ -664,28 +666,30 @@ sub lspositions {
 
   # perform the access
   my $sth = $dbh->prepare($stmt);
-  $sth->execute() or die("Failed to retrive portfolio info");
+  my $rows = $sth->execute;
 
-  # print the results
-  print "$tl\n\t\t\t\tPortfolio listing\n$fl\n";
-  printf "%-7.7s%7.7s%5.5s%8.8s%8.8s%10.10s%12.12s%10.10s%11s\n$fl\n",
-      "Symbol", "Shares", "FX", "  Type", "  Owner", "    Cost", "    Date",
-  " Price", " Net";
-  my $sum = 0;
-  while (my @row_ary = $sth->fetchrow_array) {
-    my ($fxthen,$fxnow) = (1.0,1.0);
-    my ($stock, $nb, $fx, $type, $owner, $cost, $pfdate, $name) = @row_ary;
-    if ($fx ne $Config{currency}) {
-      $fxthen = GetFXDatum($dbh, $pfdate, $fx);
-      $fxnow = GetFXDatum($dbh, $date, $fx);
-      print "Running SQL for $pfdate and $fx: $fxthen -> $fxnow\n" if $Config{debug};
+  if ( defined($rows) and $rows > 0 ) {
+    # print the results
+    print "$tl\n\t\t\t\tPortfolio listing\n$fl\n";
+    printf "%-7.7s%7.7s%5.5s%8.8s%8.8s%8.8s%12.12s%8.8s%11s\n$fl\n",
+        "Symbol", "Shares", "FX", "  Type", "  Owner", "    Cost", "    Date",
+	" Price", " Net";
+    my $sum = 0;
+    while (my @row_ary = $sth->fetchrow_array) {
+      my ($fxthen,$fxnow) = (1.0,1.0);
+      my ($stock, $nb, $fx, $type, $owner, $cost, $pfdate, $name) = @row_ary;
+      if ($fx ne $Config{currency}) {
+	$fxthen = GetFXDatum($dbh, $pfdate, $fx);
+	$fxnow = GetFXDatum($dbh, $date, $fx);
+	print "Running SQL for $pfdate and $fx: $fxthen -> $fxnow\n" if $Config{debug};
+      }
+      my $pnl = $nb * ($prices->{$name}*$fxnow - $cost*$fxthen);
+      printf "%-7.7s%7d%5s%8s%8s%8.2f%12s%8.2f%11.2f\n",
+       $stock, $nb, $fx, $type, $owner, $cost, $pfdate, $prices->{$name}, $pnl;
+      $sum = $sum + $pnl;
     }
-    my $pnl = $nb * ($prices->{$name}*$fxnow - $cost*$fxthen);
-    printf "%-7.7s%7d%5s%8s%8s%10.2f%12s%10.2f%11.2f\n",
-     $stock, $nb, $fx, $type, $owner, $cost, $pfdate, $prices->{$name}, $pnl;
-    $sum = $sum + $pnl;
+    printf "$fl\nTotal profit or loss\t\t\t\t\t%18.2f\n$tl\n", $sum;
   }
-  printf "$fl\nTotal profit or loss\t\t\t\t\t%22.2f\n$tl\n", $sum;
   $sth->finish;
 }
 

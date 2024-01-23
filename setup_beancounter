@@ -68,7 +68,7 @@ fi
 
 # Dow Jones Industrial Average 
 # see for example http://www.amex.com/indexshares/index_shares_diamonds_list.stm
-DJIA="AA AXP T BA CAT C KO DIS DD XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG T UTX WMT"
+DJIA="AA AXP T BA CAT C KO DIS DD EK XOM GE GM HPQ HD HON INTC IBM IP JNJ MCD MRK MSFT MMM JPM MO PG T UTX WMT"
 
 # S&P500 is at http://www.spglobal.com/ssindexmain500text.html
 # NASDAQ is at http://www.nasdaq.com/asp/nasdaq100_activity.stm
@@ -121,12 +121,12 @@ function create_mysql_tables
 	day_close float default NULL,
 	day_change float default NULL,
 	UNIQUE KEY fxprices_pkey(currency,date)
-    ) ENGINE='MyISAM';
+    ) TYPE=MyISAM;
 
     CREATE TABLE indices (
 	symbol varchar(12) NOT NULL default '',
 	stockindex varchar(12) NOT NULL default ''
-    ) ENGINE=MyISAM;
+    ) TYPE=MyISAM;
 
     CREATE TABLE portfolio (
 	symbol varchar(16) NOT NULL default '',
@@ -137,7 +137,7 @@ function create_mysql_tables
 	cost float default NULL,
 	date date default NULL,
 	UNIQUE KEY portfolio_pkey(symbol,owner,date)
-    ) ENGINE=MyISAM;
+    ) TYPE=MyISAM;
 
     CREATE TABLE stockinfo (
 	symbol varchar(12) NOT NULL default '',
@@ -152,7 +152,7 @@ function create_mysql_tables
 	avg_volume int(11) default NULL,
 	active bool default '1',
 	PRIMARY KEY (symbol)
-    ) ENGINE=MyISAM;
+    ) TYPE=MyISAM;
 
     CREATE TABLE stockprices (
 	symbol varchar(12) NOT NULL default '',
@@ -167,7 +167,7 @@ function create_mysql_tables
 	ask float default NULL,
 	volume numeric default NULL,
 	UNIQUE KEY stockprices_pkey(symbol,date)
-    ) ENGINE=MyISAM;
+    ) TYPE=MyISAM;
 
     create table cash (
 	name varchar(16) not null default '',
@@ -178,7 +178,7 @@ function create_mysql_tables
 	cost float default NULL,
 	date date default NULL,
 	UNIQUE KEY cash_pkey(name,type,owner,date)
-    ) ENGINE=MyISAM;
+    ) TYPE=MyISAM;
     \q
 EOF
 }
@@ -604,7 +604,7 @@ echo "Filling $DATABASE with historical fx prices for EUR and CAD"
 execute "$BEANCOUNTER fxbackpopulate --ubcfx --prevdate '1 year ago' --date '$LASTBIZDAY' EUR CAD"
 
 echo "Running portfolio pl report on (sample) portfolio"
-execute "$BEANCOUNTER plreport --currency USD --date '$LASTBIZDAY'"
+execute "$BEANCOUNTER plreport --date '$LASTBIZDAY'"
 
 # dayendreport needs a db entry previous price which we don't get from 
 # all backpop routines / data combinations
@@ -612,7 +612,7 @@ execute "$BEANCOUNTER plreport --currency USD --date '$LASTBIZDAY'"
 #execute "$BEANCOUNTER dayendreport --date '$LASTBIZDAY'"
 
 echo "Running portfolio riskreport on (sample) portfolio"
-execute "$BEANCOUNTER risk --currency USD --date '$LASTBIZDAY'"
+execute "$BEANCOUNTER risk --date '$LASTBIZDAY'"
 
 echo "Done."
 exit 0
