@@ -252,10 +252,10 @@ sub build_lines {
 sub display_report {
   my ($pretty_date, $pretty_prev_date, $prices, $prev_prices,
       $fx_prices, $prev_fx_prices, $shares, $fx, $pricedate) = @_;
-  my ($tl,$fl) = build_lines(79);
+  my ($tl,$fl) = build_lines(81);
 
-  print "$tl\n" . "Profit / loss\t\t  from $pretty_prev_date" .
-    "\tto $pretty_date  abs, rel change" . "\n$fl\n";
+  print "$tl\n" . "Profit / loss\t\t   from $pretty_prev_date" .
+    "\t  to $pretty_date  abs, rel change" . "\n$fl\n";
   my (%value, %value_prev);
   foreach my $key (sort keys %$shares) {
     my ($name,$count) = split /:/, $key;
@@ -282,19 +282,19 @@ sub display_report {
     my $value_prev = $value_prev{$name};
     print "$name $value_prev\n" if $Config{verbose};
     if (Date_Cmp($pricedate->{$name}, $Config{lastbizday}) != 0) {
-      printf("%*s %3s %19s %10.2f %8.2f\n", 
+      printf("%*s %3s %19s %11.2f %8.2f\n",
 	     -18, substr($name,0,17), $fx->{$name}, 
 	     " (from $pricedate->{$name})",
 	     $value, $prices->{$name}); 
     } elsif ( ($value_prev == 0) || (!defined($prev_prices->{$name})) ) {
-      printf("%*s %3s %20s %10.2f %8.2f %8.2f %7s\n", 
+      printf("%*s %3s %20s %11.2f %8.2f %8.2f %7s\n",
 	     -18, substr($name,0,17), $Config{currency}, 
 	     "(no price available)",
 	     $value, $prices->{$name}, 
 	     $value-$value_prev, 
 	     "N/A"); 
     } else {
-      printf("%*s %3s %10.2f %8.2f %10.2f %8.2f %8.2f %6.2f%%\n", 
+      printf("%*s %3s %11.2f %8.2f %11.2f %8.2f %8.2f %6.2f%%\n",
 	     -18, substr($name,0,17), $Config{currency}, 
 	     $value_prev, $prev_prices->{$name},
 	     $value, $prices->{$name}, 
@@ -305,7 +305,7 @@ sub display_report {
     $assets_prev += $value_prev;
   }
   print "$fl\n";
-  printf("%-16s   %3s %10.2f          %10.2f      %12.2f %6.2f%%\n", 
+  printf("%-16s   %3s %11.2f          %11.2f      %12.2f %6.2f%%\n",
 	 "Grand Total",  $Config{currency}, $assets_prev, $assets, 
 	 $assets-$assets_prev, 100*($assets/$assets_prev-1));
   print "$tl\n";
@@ -371,7 +371,7 @@ sub display_status {
   }
 
   print "$fl\n";
-  printf("%-16s %29s %10.2f %20s\n", 
+  printf("%-16s %29s %11.2f %20s\n",
 	 "Grand Total",  $Config{currency}, $assets, 
 	 $assetbase ? sprintf("%20.2f%%",$weightedreturn/$assetbase) : "NaN");
   print "$fl\n";
@@ -418,7 +418,7 @@ sub display_longstatus {
 	$assetbase += $invested;
       }
     }
-    printf("%*s %6d   %3s %8.2f   %3s %10.2f  %s %s\n", 
+    printf("%*s %6d   %3s %8.2f  %3s %11.2f  %s %s\n",
 	   -18, substr($name,0,17), 
 	   $shares->{$key},  
 	   $fx->{$name}, 
@@ -436,15 +436,15 @@ sub display_longstatus {
     $assets += $value;
     $assetbase += $value;
 
-    printf("%*s %s %3s %10.2f\n", 
-	   -16, substr($name,0,16), " " x 25,
+    printf("%*s %s %3s %11.2f\n",
+	   -16, substr($name,0,16), " " x 24,
 	   $Config{currency},
 	   $value,
 	  );
   }
 
   print "$fl\n";
-  printf("%-16s %29s %10.2f %20s\n", 
+  printf("%-16s %28s %11.2f %20s\n",
 	 "Grand Total",  $Config{currency}, $assets, 
 	 $assetbase ? sprintf("%20.2f%%",$weightedreturn/$assetbase) : "NaN");
   print "$fl\n";
